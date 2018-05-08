@@ -62,15 +62,15 @@ def scheduler_optimize(probabilities, learning_rate, batch_size):
     """
     num_sentences = 5
     with tf.variable_scope("scheduler/optimize"):
-        labels = tf.placeholder(tf.int32, (batch_size, num_sentences), name="label")
+        labels = tf.placeholder(tf.int32, (batch_size, num_sentences, num_sentences), name="label")
         training_vars = tf.trainable_variables()
-        cross_entropy_total = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=probabilities)
-        cross_entropy = tf.identity(cross_entropy_total, name="cross_entropy")
-        grads, _ = tf.clip_by_global_norm(tf.gradients(cross_entropy, training_vars), 5)  # Max gradient of 5
+        mse_total = tf.losses.mean_squared_error(labels, probabilities)
+        mse = tf.identity(mse_total, name="mse")
+        grads, _ = tf.clip_by_global_norm(tf.gradients(mse, training_vars), 5)  # Max gradient of 5
         optimizer = tf.train.AdamOptimizer(learning_rate)
         optimizer.apply_gradients(zip(grads, training_vars))
-        opt = optimizer.minimize(cross_entropy, name="optimizer")
-        return opt, cross_entropy
+        opt = optimizer.minimize(mse, name="optimizer")
+        return opt, mse
 
 
 def scheduler_preprocess(word_to_index, line):
@@ -94,13 +94,14 @@ def scheduler_get_labels(batch):
     :return: (batch, labels) labels of size (batch size x # sentences)
     """
     new_batch = np.copy(batch)
-    labels = np.zeros((len(batch), len(batch[0])))
+    labels = np.zeros((len(batch), len(batch[0]), len(batch[0])))
     for k in range(len(batch)):
         sentences = list(range(len(batch[k])))
         np.random.shuffle(sentences)
         for i in range(len(batch[k])):
             new_batch[k][i] = batch[k][sentences[i]]
-            labels[k][i] = sentences[i]
+            for j in range(len(batch[k])):
+                labels[k][i][j] = 1 if j == sentences[i] else 0
     return new_batch, labels
 
 

@@ -22,9 +22,9 @@ training_set.load_vocab('./default.voc', vocab_size)
 # print(training_set.get(2, batch_size, random=True))
 
 output = scheduler(batch_size, vocab_size, embedding_size, hidden_size)
-opt, cross_entropy = scheduler_optimize(output, learning_rate, batch_size)
+opt, mse = scheduler_optimize(output, learning_rate, batch_size)
 
-tf.summary.scalar("cost", cross_entropy)
+tf.summary.scalar("cost", mse)
 
 with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=2,
                                       intra_op_parallelism_threads=2)) as sess:
@@ -39,9 +39,9 @@ with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=2,
 
                 batch = training_set.get(k, batch_size, random=True)
                 shuffled_batch, labels = scheduler_get_labels(batch)
-                probabilities, _, computed_cross_entropy, summary = sess.run(
+                probabilities, _, computed_mse, summary = sess.run(
                     ['scheduler/order_probability:0', 'scheduler/optimize/optimizer',
-                     'scheduler/optimize/cross_entropy:0', summary_op],
+                     'scheduler/optimize/mse:0', summary_op],
                     {'scheduler/x:0': shuffled_batch,
                      'scheduler/optimize/label:0': labels})
                 writer.add_summary(summary, epoch * len(training_set) + k)
