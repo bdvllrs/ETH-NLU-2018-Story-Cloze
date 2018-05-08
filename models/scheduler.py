@@ -52,7 +52,7 @@ def scheduler(batch_size, vocab_size, embedding_size, hidden_size, num_rnns=2):
         output = tf.contrib.layers.fully_connected(flattened_sentences, num_sentences * num_sentences)
         output = tf.reshape(output, (batch_size, num_sentences, num_sentences))
         order_probability = tf.nn.softmax(output, name='order_probability')
-        return order_probability
+        return word_embeddings, order_probability
 
 
 def scheduler_optimize(probabilities, learning_rate, batch_size):

@@ -1,7 +1,9 @@
+import os
 import tensorflow as tf
 import time
 from tqdm import tqdm
 from models import scheduler, scheduler_preprocess, scheduler_get_labels, scheduler_optimize
+from utils import load_embedding
 from Dataloader import Dataloader
 
 vocab_size = 20000
@@ -13,6 +15,8 @@ num_rnns = 2
 learning_rate = 0.1
 n_epochs = 10
 
+embeddingpath = os.path.abspath(os.path.join(os.path.curdir, './wordembeddings.word2vec'))
+
 training_set = Dataloader('data/train_stories.csv')
 training_set.set_preprocess_fn(scheduler_preprocess)
 training_set.set_special_tokens(['<pad>', '<unk>'])
@@ -21,7 +25,7 @@ training_set.set_special_tokens(['<pad>', '<unk>'])
 training_set.load_vocab('./default.voc', vocab_size)
 # print(training_set.get(2, batch_size, random=True))
 
-output = scheduler(batch_size, vocab_size, embedding_size, hidden_size)
+word_embeddings, output = scheduler(batch_size, vocab_size, embedding_size, hidden_size)
 opt, mse = scheduler_optimize(output, learning_rate, batch_size)
 
 tf.summary.scalar("cost", mse)
@@ -31,6 +35,10 @@ with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=2,
     timestamp = str(int(time.time()))
     writer = tf.summary.FileWriter('./logs/' + timestamp, sess.graph)
     sess.run(tf.global_variables_initializer())
+
+    # Load word2vec pretrained embeddings
+    load_embedding(sess, training_set.word_to_index, word_embeddings, embeddingpath, embedding_size, vocab_size)
+
     computed_cross_entropy = 0
     for epoch in range(n_epochs):
         for k in tqdm(range(0, len(training_set), batch_size)):

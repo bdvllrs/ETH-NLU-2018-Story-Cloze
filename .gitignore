@@ -2,3 +2,4 @@
 logs/
 *cache*
 *.pyc
+*.word2vec
