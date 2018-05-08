@@ -64,8 +64,6 @@ def scheduler_optimize(probabilities, learning_rate, batch_size):
     with tf.variable_scope("scheduler/optimize"):
         labels = tf.placeholder(tf.int32, (batch_size, num_sentences), name="label")
         training_vars = tf.trainable_variables()
-        # Weights to get rid of the loss for <pad> token
-        # We are assuming here that the token is 0...
         cross_entropy_total = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=probabilities)
         cross_entropy = tf.identity(cross_entropy_total, name="cross_entropy")
         grads, _ = tf.clip_by_global_norm(tf.gradients(cross_entropy, training_vars), 5)  # Max gradient of 5
