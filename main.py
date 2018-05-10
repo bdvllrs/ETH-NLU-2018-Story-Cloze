@@ -13,5 +13,11 @@ config = Config('config.json', args)
 config.set('embedding_path', os.path.abspath(os.path.join(os.path.curdir, './wordembeddings.word2vec')))
 
 training_set = Dataloader('data/train_stories.csv')
+training_set.set_special_tokens(['<pad>', '<unk>'])
+training_set.load_vocab('./default.voc', config.vocab_size)
+# training_set.compute_vocab()
+# training_set.save_vocab('./default.voc')
 
-run(config, training_set, None)
+testing_set = None  # TODO
+
+run(config, training_set, testing_set)
