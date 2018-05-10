@@ -7,6 +7,8 @@ It gets 5 shuffled sentences and outputs for each sentences the probability that
 ## Config
 Config file is `config.json` file.
 
+## Add a model
+
 ### Model
 - bi-directional LSTMS
 - sum of all the sequences
