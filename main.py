@@ -41,7 +41,7 @@ with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=2,
     sess.run(tf.global_variables_initializer())
 
     # Load word2vec pretrained embeddings
-    # load_embedding(sess, training_set.word_to_index, word_embeddings, embeddingpath, embedding_size, vocab_size)
+    load_embedding(sess, training_set.word_to_index, scheduler_model.word_embeddings, embeddingpath, embedding_size, vocab_size)
 
     computed_cross_entropy = 0
     for epoch in range(n_epochs):
@@ -58,9 +58,9 @@ with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=2,
                      'scheduler/optimize/label:0': labels})
                 writer.add_summary(summary, epoch * len(training_set) + k)
         training_set.shuffle_lines()
-        if not epoch % save_model_every:
-            tf.saved_model.simple_save(sess, './builds/' + timestamp + '/epoch-' + str(epoch),
-                                       {'scheduler/x:0': scheduler_model.x,
-                                        'scheduler/optimize/label:0': scheduler_model.labels},
-                                       {'scheduler/order_probability:0': scheduler_model.probabilities,
-                                        'scheduler/optimize/mse:0': scheduler_model.mse})
+        # if not epoch % save_model_every:
+        #     tf.saved_model.simple_save(sess, './builds/' + timestamp + '/epoch-' + str(epoch),
+        #                                {'scheduler/x:0': scheduler_model.x,
+        #                                 'scheduler/optimize/label:0': scheduler_model.labels},
+        #                                {'scheduler/order_probability:0': scheduler_model.probabilities,
+        #                                 'scheduler/optimize/mse:0': scheduler_model.mse})
