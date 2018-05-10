@@ -1,4 +1,5 @@
 import os
+import nltk
 from utils import Config
 import argparse
 from scripts import run
@@ -8,6 +9,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", help="Model to use")
 parser.add_argument("--nthreads", '-t', type=int, default=2, help="Number of threads to use")
 args = parser.parse_args()
+
+# nlkt.download('punkt')
 
 config = Config('config.json', args)
 
