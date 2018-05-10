@@ -5,7 +5,7 @@ from models import Scheduler, scheduler_preprocess, scheduler_get_labels
 from utils import load_embedding
 
 
-def main(training_set, config):
+def main(config, training_set, testing_set):
     training_set.set_preprocess_fn(scheduler_preprocess)
     training_set.set_special_tokens(['<pad>', '<unk>'])
     # training_set.compute_vocab()

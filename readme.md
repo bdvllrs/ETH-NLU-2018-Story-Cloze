@@ -4,6 +4,9 @@
 The goal of this model is to get try to find the order of the story given shuffled sentences.
 It gets 5 shuffled sentences and outputs for each sentences the probability that the sentence is in each position.
 
+## Config
+Config file is `config.json` file.
+
 ### Model
 - bi-directional LSTMS
 - sum of all the sequences
