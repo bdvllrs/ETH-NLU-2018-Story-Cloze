@@ -22,12 +22,9 @@ elif config.model == "some_name":
 ```
 5. Change in the `config.json` file the model parameter for the new model name to try it.
 
-### Model
-- bi-directional LSTMS
-- sum of all the sequences
-- 2 conv2D, pool2D layers
-- linear layer
-- softmax layer
+## Model list
+- `scheduler`
+- `seq2seq`
 
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>

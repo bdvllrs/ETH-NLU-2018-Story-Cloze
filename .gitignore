@@ -5,6 +5,8 @@ builds/
 *.pyc
 *.word2vec
 config/*.json
+setup.sh
+data/
 
 # Add default config
 !config/default.json

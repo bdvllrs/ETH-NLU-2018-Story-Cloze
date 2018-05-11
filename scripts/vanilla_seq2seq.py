@@ -24,7 +24,7 @@ def main(config, training_set, testing_set):
     with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=nthreads_inter,
                                           intra_op_parallelism_threads=nthreads_intra)) as sess:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        writer = tf.summary.FileWriter('./logs/' + timestamp, sess.graph)
+        writer = tf.summary.FileWriter('./logs/' + timestamp + '/train/', sess.graph)
         test_writer = tf.summary.FileWriter('./logs/' + timestamp + '/test/', sess.graph)
         saver = tf.train.Saver()
         sess.run(tf.global_variables_initializer())
