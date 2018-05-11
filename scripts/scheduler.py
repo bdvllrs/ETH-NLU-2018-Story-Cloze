@@ -1,6 +1,5 @@
 import datetime
 import numpy as np
-from tqdm import tqdm
 import tensorflow as tf
 from models import Scheduler, scheduler_preprocess, scheduler_get_labels
 from utils import load_embedding
@@ -38,8 +37,7 @@ def main(config, training_set, testing_set):
                 # Testing phase
                 success = 0
                 total = 0
-                print('Testing')
-                for k in tqdm(range(0, len(testing_set), config.batch_size)):
+                for k in range(0, len(testing_set), config.batch_size):
                     if k + config.batch_size < len(testing_set):
                         batch_endings1, batch_endings2, correct_ending = testing_set.get(k, config.batch_size,
                                                                                          random=True)
@@ -67,7 +65,7 @@ def main(config, training_set, testing_set):
                 accuracy_summary = tf.Summary()
                 accuracy_summary.value.add(tag='accuracy', simple_value=accuracy)
                 test_writer.add_summary(accuracy_summary, epoch)
-            for k in tqdm(range(0, len(training_set), config.batch_size)):
+            for k in range(0, len(training_set), config.batch_size):
                 if k + config.batch_size < len(training_set):
                     summary_op = tf.summary.merge_all()
 
