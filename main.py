@@ -1,9 +1,7 @@
 import os
-import numpy as np
 from utils import Config
 import argparse
 from scripts import run
-from models import scheduler_preprocess
 from Dataloader import Dataloader
 
 parser = argparse.ArgumentParser()
@@ -11,7 +9,7 @@ parser.add_argument("-m", "--model", help="Model to use")
 parser.add_argument("--nthreads", '-t', type=int, default=2, help="Number of threads to use")
 args = parser.parse_args()
 
-config = Config('config.json', args)
+config = Config('./config', args)
 
 config.set('embedding_path', os.path.abspath(os.path.join(os.path.curdir, './wordembeddings.word2vec')))
 

@@ -4,3 +4,7 @@ builds/
 *cache*
 *.pyc
 *.word2vec
+config/*.json
+
+# Add default config
+!config/default.json
