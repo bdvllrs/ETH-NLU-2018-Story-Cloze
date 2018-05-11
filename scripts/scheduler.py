@@ -44,14 +44,12 @@ def main(config, training_set, testing_set):
                         total += config.batch_size
                         shuffled_batch1, labels1 = scheduler_get_labels(batch_endings1)
                         shuffled_batch2, labels2 = scheduler_get_labels(batch_endings2)
-                        probabilities1, _, _ = sess.run(
-                            ['scheduler/order_probability:0', 'scheduler/optimize/optimizer',
-                             'scheduler/optimize/mse:0'],
+                        probabilities1 = sess.run(
+                            'scheduler/order_probability:0',
                             {'scheduler/x:0': shuffled_batch1,
                              'scheduler/optimize/label:0': labels1})
-                        probabilities2, _, _ = sess.run(
-                            ['scheduler/order_probability:0', 'scheduler/optimize/optimizer',
-                             'scheduler/optimize/mse:0'],
+                        probabilities2 = sess.run(
+                            'scheduler/order_probability:0',
                             {'scheduler/x:0': shuffled_batch2,
                              'scheduler/optimize/label:0': labels2})
                         for b in range(config.batch_size):
