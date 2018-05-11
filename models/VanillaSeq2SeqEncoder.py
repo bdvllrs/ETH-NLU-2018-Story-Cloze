@@ -31,21 +31,20 @@ class VanillaSeq2SeqEncoder:
 
             with tf.variable_scope("embedding", reuse=tf.AUTO_REUSE):
                 self.word_embeddings = tf.get_variable("word_embeddings",
-                                                           [self.vocab_size, self.embedding_size], dtype=tf.float32)
+                                                       [self.vocab_size, self.embedding_size], dtype=tf.float32)
             # Shape: batch size x sequence length x embedding size
             inputs = tf.nn.embedding_lookup(self.word_embeddings, self.x, name="input")
             print(inputs)
-            
+
             inputs_flattened = tf.reshape(inputs, (self.batch_size * self.num_sentences, -1, self.embedding_size))
             rnn_cell = tf.nn.rnn_cell.BasicLSTMCell
             outputs_flattened, _ = tf.nn.dynamic_rnn(rnn_cell(self.hidden_size), inputs_flattened, dtype=tf.float32)
             outputs = tf.reshape(outputs_flattened,
                                  (self.batch_size, self.num_sentences, -1, self.hidden_size))
-            
-            
-            last_output = tf.expand_dims(outputs[:,:,-1,:],3)
-            #summed_output = tf.expand_dims(tf.reduce_sum(outputs, 2), 3)
-            
+
+            last_output = tf.expand_dims(outputs[:, :, -1, :], 3)
+            # summed_output = tf.expand_dims(tf.reduce_sum(outputs, 2), 3)
+
             conv1 = tf.layers.conv2d(
                 inputs=last_output,
                 filters=5,
@@ -64,7 +63,7 @@ class VanillaSeq2SeqEncoder:
             flattened_sentences = tf.reshape(pool2, (self.batch_size, -1))
             # Gives an output between 0 and 1
             # representing the probability of the last sentence being correct
-            output = tf.contrib.layers.fully_connected(flattened_sentences, self.num_sentences-3)
+            output = tf.contrib.layers.fully_connected(flattened_sentences, self.num_sentences - 3)
             # output = tf.reshape(output, (self.batch_size, self.num_sentences-3))
             order_probability = tf.nn.softmax(output, name='order_probability')
             self.probabilities = order_probability
@@ -72,7 +71,7 @@ class VanillaSeq2SeqEncoder:
 
     def optimize(self, learning_rate):
         with tf.variable_scope("scheduler/optimize"):
-            self.labels = tf.placeholder(tf.int32, (self.batch_size, self.num_sentences-3), name="label")
+            self.labels = tf.placeholder(tf.int32, (self.batch_size, self.num_sentences - 3), name="label")
             training_vars = tf.trainable_variables()
             mse_total = tf.losses.mean_squared_error(self.labels, self.probabilities)
             self.mse = tf.identity(mse_total, name="mse")
@@ -150,18 +149,11 @@ def scheduler_optimize(probabilities, learning_rate, batch_size):
         return opt, mse
 
 
-def scheduler_preprocess(word_to_index, line):
-    sentences = line[2:]  # remove the 2 first cols id and title
-    tokenized_sentences = []
-    for sentence in sentences:
-        sentence = sentence.lower()
-        sentence = word_tokenize(sentence)
-        # replace unknown by <unk>
-        sentence = list(map(lambda word: word if word in word_to_index.keys() else '<unk>', sentence))
-        # replace words by tokens
-        sentence = list(map(lambda word: word_to_index[word], sentence))
-        tokenized_sentences.append(sentence)
-    return tokenized_sentences
+def scheduler_preprocess(word_to_index, sentence):
+    sentence = list(map(lambda word: word if word in word_to_index.keys() else '<unk>', sentence))
+    # replace words by tokens
+    sentence = list(map(lambda word: word_to_index[word], sentence))
+    return sentence
 
 
 def scheduler_get_labels(batch):
@@ -171,15 +163,15 @@ def scheduler_get_labels(batch):
     :return: (batch, labels) labels of size (batch size x # sentences)
     """
     new_batch = np.copy(batch)
-    labels = np.zeros((len(batch), len(batch[0])-3))
+    labels = np.zeros((len(batch), len(batch[0]) - 3))
     for k in range(len(batch)):
         sentences = list(range(3, len(batch[k])))
         np.random.shuffle(sentences)
         for i in range(3):
             new_batch[k][i] = batch[k][i]
         for i in range(3, len(batch[k])):
-            new_batch[k][i] = batch[k][sentences[i-3]]
-            labels[k][i-3] = 1 if sentences[i-3] == len(batch[k])-1 else 0
+            new_batch[k][i] = batch[k][sentences[i - 3]]
+            labels[k][i - 3] = 1 if sentences[i - 3] == len(batch[k]) - 1 else 0
     return new_batch, labels
 
 
