@@ -17,10 +17,13 @@ class SentenceEmbedding:
             # batch size x number of sentences x embedding_size
             self.x = tf.placeholder(tf.float64, (self.batch_size, self.num_sentences, self.embedding_size), name="x")
             self.label = tf.placeholder(tf.float64, (self.batch_size, self.embedding_size), "label")
-            hidden1 = tf.layers.dense(self.x, self.embedding_size, activation=tf.nn.relu,
+            hidden1 = tf.layers.dense(self.x, 100, activation=tf.nn.relu,
                                       kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                       bias_initializer=tf.contrib.layers.xavier_initializer())
-            self.output = tf.layers.dense(hidden1, self.embedding_size, activation=tf.nn.relu,
+            hidden2 = tf.layers.dense(hidden1, 100, activation=tf.nn.relu,
+                                      kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                      bias_initializer=tf.contrib.layers.xavier_initializer())
+            self.output = tf.layers.dense(hidden2, 50, activation=tf.nn.relu,
                                       kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                       bias_initializer=tf.contrib.layers.xavier_initializer(), name="output")
             input_mean = tf.reduce_mean(self.output, axis=1)
