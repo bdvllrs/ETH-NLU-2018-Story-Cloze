@@ -25,6 +25,7 @@ elif config.model == "some_name":
 ## Model list
 - `scheduler`
 - `seq2seq`
+- `sentence_embedding`
 
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>

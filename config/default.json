@@ -8,5 +8,10 @@
   "save_model_every": 10,
   "test_every": 10,
 
-  "model": "scheduler"
+  "model": "scheduler",
+
+  "sent2vec": {
+    "model": null,
+    "embedding_size": 500
+  }
 }
