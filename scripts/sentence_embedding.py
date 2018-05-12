@@ -1,6 +1,6 @@
 import datetime
 import tensorflow as tf
-import numpy as np
+from tqdm import tqdm
 from models import SentenceEmbedding
 import sent2vec
 
@@ -45,9 +45,12 @@ def main(config, training_set, testing_set):
         sess.run(tf.global_variables_initializer())
 
         for epoch in range(config.n_epochs):
-            print("Epoch", epoch)
+            if config.debug:
+                print("Epoch", epoch)
             if not epoch % config.test_every:
-                print('Testing...')
+                if config.debug:
+                    print('Testing...')
+                    progress_bar = tqdm(total=len(testing_set))
                 # Testing phase
                 success = 0
                 total = 0
@@ -73,11 +76,17 @@ def main(config, training_set, testing_set):
                             else:
                                 if correct_ending[b] == 1:
                                     success += 1
+                        if config.debug:
+                            progress_bar.update(config.batch_size)
                 accuracy = float(success) / float(total)
                 accuracy_summary = tf.Summary()
                 accuracy_summary.value.add(tag='accuracy', simple_value=accuracy)
                 test_writer.add_summary(accuracy_summary, epoch)
                 print("Testing:", accuracy)
+                if config.debug:
+                    progress_bar.close()
+            if config.debug:
+                progress_bar = tqdm(total=len(training_set))
             for k in range(0, len(training_set), config.batch_size):
                 if k + config.batch_size < len(training_set):
                     summary_op = tf.summary.merge_all()
@@ -85,13 +94,18 @@ def main(config, training_set, testing_set):
                     batch = training_set.get(k, config.batch_size, random=True)
                     shuffled_batch, labels = get_labels(batch)
                     distances, _, summary = sess.run(
-                        ['sentence_embedding/distance:0', 'sentence_embedding/optimize/optimizer', summary_op],
+                        ['sentence_embedding/distance_sum:0', 'sentence_embedding/optimize/optimizer', summary_op],
                         {'sentence_embedding/x:0': shuffled_batch,
                          'sentence_embedding/label:0': labels})
+                    print(distances)
+                    if config.debug:
+                        progress_bar.update(config.batch_size)
                     train_writer.add_summary(summary, epoch * len(training_set) + k)
                     if not epoch % config.save_model_every:
                         model_path = './builds/' + timestamp
                         saver.save(sess, model_path, global_step=epoch)
+            if config.debug:
+                progress_bar.close()
             training_set.shuffle_lines()
             if not epoch % config.save_model_every:
                 model_path = './builds/' + timestamp + '/model'
