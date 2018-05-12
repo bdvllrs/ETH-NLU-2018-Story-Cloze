@@ -26,8 +26,11 @@ class SentenceEmbedding:
             self.output = tf.layers.dense(hidden2, 50, activation=tf.nn.relu,
                                       kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                       bias_initializer=tf.contrib.layers.xavier_initializer(), name="output")
+            self.label_output = tf.layers.dense(self.label, 50, activation=tf.nn.relu,
+                                          kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                          bias_initializer=tf.contrib.layers.xavier_initializer(), name="label_output")
             input_mean = tf.reduce_mean(self.output, axis=1)
-            self.distance = tf.identity(tf.norm(self.label - input_mean, axis=1), name="distance")
+            self.distance = tf.identity(tf.norm(self.label_output - input_mean, axis=1), name="distance")
             self.distance_sum = tf.reduce_sum(self.distance, name="distance_sum")
             return self.output
 
