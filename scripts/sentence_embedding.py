@@ -1,7 +1,9 @@
-import datetime
+import random
+
 import tensorflow as tf
-from tqdm import tqdm
+import numpy as np
 from models import SentenceEmbedding
+from utils import train_test
 import sent2vec
 
 
@@ -15,8 +17,94 @@ class Preprocess:
         return sentence
 
 
-def get_labels(batch):
-    return batch[:, :4, :], batch[:, 4, :]
+def mix_batches(right_ending, wrong_ending, sentiments, bad_ending_sentiment):
+    batch1 = np.zeros(right_ending.shape)
+    batch2 = np.zeros(wrong_ending.shape)
+    label1 = np.zeros(len(right_ending))
+    label2 = np.zeros(len(right_ending))
+    sent1 = sentiments[:]
+    sent2 = sentiments[:]
+    for k in range(len(right_ending)):
+        if random.random() > 0.5:
+            batch1[k] = right_ending[k]
+            label1[k] = 1
+            batch2[k] = wrong_ending[k]
+            label2[k] = 0
+            sent2[k, -2:] = bad_ending_sentiment[k]
+        else:
+            batch2[k] = right_ending[k]
+            label2[k] = 1
+            batch1[k] = wrong_ending[k]
+            label1[k] = 0
+            sent1[k, -2:] = bad_ending_sentiment[k]
+    return batch1, label1, batch2, label2, sent1, sent2
+
+
+def test_fn(config, testing_set, sess, epoch, k):
+    """
+    Function executed for each batch for testing
+    :param config:
+    :param testing_set:
+    :param sess:
+    :param epoch:
+    :param k:
+    """
+    batch_endings1, batch_endings2, correct_ending, sent1, sent2 = testing_set.get(k, config.batch_size,
+                                                                                   random=True, with_sentiments=True)
+    sentence1, ending1 = batch_endings1[:, 3, :], batch_endings1[:, 4, :]
+    sentence2, ending2 = batch_endings2[:, 3, :], batch_endings2[:, 4, :]
+    output = [None, None]
+    output[0] = sess.run(
+        'sentence_embedding/output:0',
+        {'sentence_embedding/last-sentence:0': sentence1,
+         'sentence_embedding/sentiment:0': sent1,
+         'sentence_embedding/ending:0': ending1})
+    output[1] = sess.run(
+        'sentence_embedding/output:0',
+        {'sentence_embedding/last-sentence:0': sentence2,
+         'sentence_embedding/sentiment:0': sent2,
+         'sentence_embedding/ending:0': ending2})
+    success = 0
+    for b in range(config.batch_size):
+        if output[correct_ending[b]][b] > output[1 - correct_ending[b]][b]:
+            success += 1
+    success = 0
+    return config.batch_size, success
+
+
+def train_fn(config, training_set, sess, epoch, k, summary_op, train_writer):
+    """
+    Function executed for each batch for training
+    :param config:
+    :param training_set:
+    :param sess:
+    :param epoch:
+    :param k:
+    :param summary_op:
+    :param train_writer:
+    """
+    batch, sentiments = training_set.get(k, config.batch_size, random=True, with_sentiments=True)
+    # Get random endings to train bad endings
+    bad_ending, bad_ending_sentiments = training_set.get(k, config.batch_size, random=True, with_sentiments=True)
+    bad_ending = bad_ending[:, 4, :]
+    bad_ending_sentiments = bad_ending_sentiments[:, 4]
+    last_sentences, right_ending = batch[:, 3, :], batch[:, 4, :]
+    batch1, label1, batch2, label2, sent1, sent2 = mix_batches(right_ending, bad_ending, sentiments,
+                                                               bad_ending_sentiments)
+    _, summary = sess.run(
+        ['sentence_embedding/optimize/optimizer', summary_op],
+        {'sentence_embedding/last-sentence:0': last_sentences,
+         'sentence_embedding/ending:0': batch1,
+         'sentence_embedding/sentiment:0': sent1,
+         'sentence_embedding/optimize/label:0': label1})  # High label for this one as it is a right ending
+    _, summary2 = sess.run(
+        ['sentence_embedding/optimize/optimizer', summary_op],
+        {'sentence_embedding/last-sentence:0': last_sentences,
+         'sentence_embedding/ending:0': batch2,
+         'sentence_embedding/sentiment:0': sent2,
+         'sentence_embedding/optimize/label:0': label2})  # High label for this one as it is a right ending
+    train_writer.add_summary(summary, epoch * len(training_set) + k)
+    train_writer.add_summary(summary2, epoch * len(training_set) + k + 0.5)
 
 
 def main(config, training_set, testing_set):
@@ -31,82 +119,6 @@ def main(config, training_set, testing_set):
     sentence_embedding()
     sentence_embedding.optimize()
 
-    tf.summary.scalar("distance", sentence_embedding.distance_sum)
+    tf.summary.scalar("cross_entropy", sentence_embedding.cross_entropy)
 
-    nthreads_intra = config.nthreads // 2
-    nthreads_inter = config.nthreads - config.nthreads // 2
-
-    with tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=nthreads_inter,
-                                          intra_op_parallelism_threads=nthreads_intra)) as sess:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        train_writer = tf.summary.FileWriter('./logs/' + timestamp + '/train/', sess.graph)
-        test_writer = tf.summary.FileWriter('./logs/' + timestamp + '/test/', sess.graph)
-        saver = tf.train.Saver()
-        sess.run(tf.global_variables_initializer())
-
-        for epoch in range(config.n_epochs):
-            if config.debug:
-                print("Epoch", epoch)
-            if not epoch % config.test_every:
-                if config.debug:
-                    print('Testing...')
-                    progress_bar = tqdm(total=len(testing_set))
-                # Testing phase
-                success = 0
-                total = 0
-                for k in range(0, len(testing_set), config.batch_size):
-                    if k + config.batch_size < len(testing_set):
-                        batch_endings1, batch_endings2, correct_ending = testing_set.get(k, config.batch_size,
-                                                                                         random=True)
-                        total += config.batch_size
-                        shuffled_batch1, labels1 = get_labels(batch_endings1)
-                        shuffled_batch2, labels2 = get_labels(batch_endings2)
-                        distances1 = sess.run(
-                            'sentence_embedding/distance:0',
-                            {'sentence_embedding/x:0': shuffled_batch1,
-                             'sentence_embedding/label:0': labels1})
-                        distances2 = sess.run(
-                            'sentence_embedding/distance:0',
-                            {'sentence_embedding/x:0': shuffled_batch2,
-                             'sentence_embedding/label:0': labels2})
-                        for b in range(config.batch_size):
-                            if distances1[b] < distances2[b]:
-                                if correct_ending[b] == 0:
-                                    success += 1
-                            else:
-                                if correct_ending[b] == 1:
-                                    success += 1
-                        if config.debug:
-                            progress_bar.update(config.batch_size)
-                accuracy = float(success) / float(total)
-                accuracy_summary = tf.Summary()
-                accuracy_summary.value.add(tag='accuracy', simple_value=accuracy)
-                test_writer.add_summary(accuracy_summary, epoch)
-                print("Testing:", accuracy)
-                if config.debug:
-                    progress_bar.close()
-            if config.debug:
-                progress_bar = tqdm(total=len(training_set))
-            for k in range(0, len(training_set), config.batch_size):
-                if k + config.batch_size < len(training_set):
-                    summary_op = tf.summary.merge_all()
-
-                    batch = training_set.get(k, config.batch_size, random=True)
-                    shuffled_batch, labels = get_labels(batch)
-                    distances, _, summary = sess.run(
-                        ['sentence_embedding/distance_sum:0', 'sentence_embedding/optimize/optimizer', summary_op],
-                        {'sentence_embedding/x:0': shuffled_batch,
-                         'sentence_embedding/label:0': labels})
-                    print(distances)
-                    if config.debug:
-                        progress_bar.update(config.batch_size)
-                    train_writer.add_summary(summary, epoch * len(training_set) + k)
-                    if not epoch % config.save_model_every:
-                        model_path = './builds/' + timestamp
-                        saver.save(sess, model_path, global_step=epoch)
-            if config.debug:
-                progress_bar.close()
-            training_set.shuffle_lines()
-            if not epoch % config.save_model_every:
-                model_path = './builds/' + timestamp + '/model'
-                saver.save(sess, model_path, global_step=epoch)
+    train_test(config, training_set, testing_set, test_fn, train_fn)

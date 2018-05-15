@@ -1,5 +1,5 @@
 import os
-from utils import Config
+from utils import Config, Sentiments
 import argparse
 from scripts import run
 from Dataloader import Dataloader
@@ -13,7 +13,10 @@ config = Config('./config', args=args)
 
 config.set('embedding_path', os.path.abspath(os.path.join(os.path.curdir, './wordembeddings.word2vec')))
 
+sentiments = Sentiments(config, './data/sentiments.txt')
+
 training_set = Dataloader('data/train_stories.csv')
+training_set.set_sentiments(sentiments)
 training_set.set_special_tokens(['<pad>', '<unk>'])
 training_set.load_vocab('./default.voc', config.vocab_size)
 
@@ -21,6 +24,7 @@ training_set.load_vocab('./default.voc', config.vocab_size)
 # training_set.save_vocab('./default.voc')
 
 testing_set = Dataloader('data/test_stories.csv', testing_data=True)
+testing_set.set_sentiments(sentiments)
 testing_set.set_special_tokens(['<pad>', '<unk>'])
 testing_set.load_vocab('./default.voc', config.vocab_size)
 

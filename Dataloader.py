@@ -18,7 +18,11 @@ class Dataloader:
         self.testing_data = testing_data
         self.preprocess_fn = lambda w, x: x
         self.special_tokens = ['<bos>', '<eos>', '<pad>', '<unk>']
+        self.sentiments = None
         self.shuffle_lines()
+
+    def set_sentiments(self, sentiments):
+        self.sentiments = sentiments
 
     def set_special_tokens(self, tokens):
         self.special_tokens = tokens
@@ -79,17 +83,22 @@ class Dataloader:
         for k, word in enumerate(self.index_to_word):
             self.word_to_index[word] = k
 
-    def get(self, index, number=1, random=False, no_preprocess=False):
+    def get(self, index, number=1, random=False, no_preprocess=False, with_sentiments=False):
         """
         Get some lines
         :param index: index of the line
         :param number: number of lines
         :param random: if random
+        :param with_sentiments: get simple sentiment analysis
         """
+        assert with_sentiments and self.sentiments is not None, "Please use set_sentiments to use sentiment analysis."
         preprocess_fn = lambda x: self.preprocess(x, no_preprocess)
         preprocess_labels_fn = lambda x: self.preprocess_labels(x, no_preprocess)
         if not random:
             batch = list(map(preprocess_fn, self.original_lines[index:index + number]))
+            if with_sentiments:
+                batch_sentiments = np.array([[i for t in l for i in t] for l in
+                                    list(map(self.get_sentiment, self.original_lines[index:index + number]))])
             max_length = self.unify_batch_length(batch)
             if self.testing_data:
                 batch_labels = list(map(preprocess_labels_fn, self.original_lines[index:index + number]))
@@ -102,6 +111,8 @@ class Dataloader:
             for i in indexes:
                 lines.append(self.original_lines[i])
             batch = list(map(preprocess_fn, lines))
+            if with_sentiments:
+                batch_sentiments = np.array([[i for t in l for i in t] for l in list(map(self.get_sentiment, lines))])
             max_length = self.unify_batch_length(batch)
             if self.testing_data:
                 batch_labels = list(map(preprocess_labels_fn, lines))
@@ -113,7 +124,20 @@ class Dataloader:
             label_sentences = np.array(label_sentences)
             batch_endings_1 = np.concatenate((batch, np.expand_dims(label_sentences[:, 0, :], axis=1)), axis=1)
             batch_endings_2 = np.concatenate((batch, np.expand_dims(label_sentences[:, 1, :], axis=1)), axis=1)
+            if with_sentiments:
+                batch_sentiments1 = np.concatenate(
+                    (batch_sentiments[:, :8], np.expand_dims(batch_sentiments[:, 8], axis=1)), axis=1)
+                batch_sentiments1 = np.concatenate(
+                    (batch_sentiments1, np.expand_dims(batch_sentiments[:, 9], axis=1)), axis=1)
+                batch_sentiments2 = np.concatenate(
+                    (batch_sentiments[:, :8], np.expand_dims(batch_sentiments[:, 10], axis=1)), axis=1)
+                batch_sentiments2 = np.concatenate(
+                    (batch_sentiments2, np.expand_dims(batch_sentiments[:, 11], axis=1)), axis=1)
+            if with_sentiments:
+                return batch_endings_1, batch_endings_2, label_choice, batch_sentiments1, batch_sentiments2
             return batch_endings_1, batch_endings_2, label_choice
+        if with_sentiments:
+            return np.array(batch), batch_sentiments
         return np.array(batch)
 
     def unify_batch_length(self, batch, max_length=None):
@@ -134,7 +158,7 @@ class Dataloader:
         return max_length
 
     def preprocess_labels(self, line, no_preprocess=False):
-        sentences = line[5:7]  # remove the 2 first cols id and title
+        sentences = line[5:7]
         tokenized_sentences = []
         for sentence in sentences:
             sentence = sentence.lower()
@@ -144,6 +168,18 @@ class Dataloader:
             tokenized_sentences.append(sentence)
         right_sentence = int(line[7])
         return tokenized_sentences, right_sentence - 1
+
+    def get_sentiment(self, line):
+        if self.testing_data:
+            sentences = line[1:7]
+        else:
+            sentences = line[2:]  # remove the 2 first cols id and title
+        sentiments = []
+        for sentence in sentences:
+            sentence = sentence.lower()
+            sentence = word_tokenize(sentence)
+            sentiments.append(self.sentiments.sentence_score(sentence))
+        return sentiments
 
     def preprocess(self, line, no_preprocess=False):
         if self.testing_data:
