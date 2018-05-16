@@ -98,7 +98,7 @@ class Dataloader:
             batch = list(map(preprocess_fn, self.original_lines[index:index + number]))
             if with_sentiments:
                 batch_sentiments = np.array([[i for t in l for i in t] for l in
-                                    list(map(self.get_sentiment, self.original_lines[index:index + number]))])
+                                             list(map(self.get_sentiment, self.original_lines[index:index + number]))])
             max_length = self.unify_batch_length(batch)
             if self.testing_data:
                 batch_labels = list(map(preprocess_labels_fn, self.original_lines[index:index + number]))
