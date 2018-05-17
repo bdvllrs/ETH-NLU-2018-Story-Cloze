@@ -27,9 +27,10 @@ def main(config, training_set, testing_set, sentiment_data):
                                               write_grads=True)
 
     model_path = os.path.abspath(
-        os.path.join(os.curdir, './builds/' + timestamp + '/sentiment_checkpoint_epoch-{epoch:02d}.hdf5'))
+        os.path.join(os.curdir, './builds/' + timestamp + '/'))
+    os.mkdir(model_path)
 
-    saver = keras.callbacks.ModelCheckpoint(model_path,
+    saver = keras.callbacks.ModelCheckpoint(model_path + 'sentiment_checkpoint_epoch-{epoch:02d}.hdf5',
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
     sentiment_model.fit_generator(sentiment_data.get_batch(), steps_per_epoch=len(sentiment_data) / config.batch_size,

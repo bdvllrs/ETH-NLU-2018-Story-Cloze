@@ -25,11 +25,22 @@ class Dataloader:
         pass
 
     def __call__(self, data):
-        print(data.batch)
+        batch = np.array(data.batch)
+        last_sentences = batch[:, 3, :]
+        endings = batch[:, 4, :]
+        label = []
         # Randomly choose a bad ending
-        if random.random() > 0.5:
-            pass
-        return data
+        for batch in range(len(batch)):
+            if random.random() > 0.5:
+                k = random.randint(0, len(data.dataloader)-1)
+                new_data = data.dataloader.get(k, raw=True)
+                new_batch = np.array(new_data.batch)
+                endings[batch] = new_batch[0, 4, :]
+                label.append(0)
+            else:
+                label.append(1)
+        print(last_sentences)
+        return [last_sentences, endings], np.array(label)
 
 
 def keras_model(config):

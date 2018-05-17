@@ -18,13 +18,9 @@ class Data:
     - config: config object
     """
 
-    def __init__(self, batch, is_testing_data, original_lines, preprocessed_lines, sentiment_lines, config):
+    def __init__(self, batch, dataloader):
         self.batch = batch
-        self.is_testing_data = is_testing_data
-        self.original_lines = original_lines
-        self.preprocessed_lines = preprocessed_lines
-        self.sentiment_lines = sentiment_lines
-        self.config = config
+        self.dataloader = dataloader
 
     def __getitem__(self, item):
         return self.get(item)
@@ -179,13 +175,14 @@ class Dataloader:
         for k, word in enumerate(self.index_to_word):
             self.word_to_index[word] = k
 
-    def get(self, index, number=1, random=False, no_preprocess=False):
+    def get(self, index, number=1, random=False, no_preprocess=False, raw=False):
         """
         Get some lines:
         :param index: index in the dataset
         :param number: number of element to return
         :param random: if it needs to be randomized
         :param no_preprocess: if true, does not preprocess the dataset with the defined preprocess_fn.
+        :param raw: if True, output_fn will not be executed
         :returns: list of shape `number x 5 x sequence length`.
         """
         lines = self.original_lines[:] if no_preprocess else self.preprocessed_lines
@@ -198,9 +195,8 @@ class Dataloader:
             batch.append(lines[line_index])
             if self.sentiments is not None:
                 sentiment_batch.append(self.sentiment_lines[line_index])
-        batch = Data(batch, self.testing_data, self.original_lines, self.preprocessed_lines, sentiment_batch,
-                     self.config)
-        return self.output_fn(batch)
+        batch = Data(batch, self)
+        return self.output_fn(batch) if not raw else batch
 
     def get_batch(self, batch_size, epochs, random=True):
         """
