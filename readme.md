@@ -30,7 +30,9 @@ The goal of this model is to get try to find the order of the story given shuffl
 It gets 5 shuffled sentences and outputs for each sentences the probability that the sentence is in each position.
 
 ## Config
-Config file is `config.json` file.
+The `utils.Config` class imports every json files from a given folder.
+In this project, every json files in the `./config` folder.
+To access a value just get as an object property (e.g. `config.batch_size` for the batch size).
 
 ## Project architecture
 - `models` folder of all model classes or functions

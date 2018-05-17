@@ -25,8 +25,10 @@ def main(config, training_set, testing_set, sentiment_data):
                                               write_graph=False,
                                               write_grads=True)
 
+    verbose = 0 if not config.debug else 1
     sentiment_model.fit_generator(sentiment_data.get_batch(), steps_per_epoch=len(sentiment_data) / config.batch_size,
                                   epochs=config.n_epochs,
+                                  verbose=verbose,
                                   validation_data=sentiment_data.get_batch(test=True),
                                   validation_steps=sentiment_data.test_length() / config.batch_size,
                                   callbacks=[tensorboard])
