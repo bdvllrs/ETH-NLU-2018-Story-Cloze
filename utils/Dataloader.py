@@ -244,8 +244,12 @@ class Dataloader:
             print('Tokenized.')
 
     def compute_preprocessed(self):
+        if self.config.debug:
+            print('Applying preprocessing to dataset...')
         preprocess_fn = lambda x: list(map(lambda s: self.preprocess_fn(self.word_to_index, s), x))
         self.preprocessed_lines = list(map(preprocess_fn, self.original_lines))
+        if self.config.debug:
+            print('Applied.')
 
     def compute_sentiment_dataset(self):
         self.sentiment_lines = []
