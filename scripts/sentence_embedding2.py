@@ -1,9 +1,7 @@
+import os
 import random
 import datetime
-import tensorflow as tf
 import keras
-from models import SentenceEmbedding
-from utils import train_test
 import numpy as np
 import sent2vec
 
@@ -12,6 +10,7 @@ class Preprocess:
     """
     Preprocess to apply to the dataset
     """
+
     def __init__(self, sent2vec_model):
         self.sent2vec_model = sent2vec_model
 
@@ -20,48 +19,61 @@ class Preprocess:
         return sentence
 
 
-class Dataloader:
-    def __init__(self):
-        pass
+def output_fn_train(data):
+    batch = np.array(data.batch)
+    last_sentences = batch[:, 3, :]
+    endings = batch[:, 4, :]
+    label = []
+    # Randomly choose a bad ending
+    for i in range(len(batch)):
+        # Only 50% of the time
+        if random.random() > 0.5:
+            k = random.randint(0, len(data.dataloader) - 1)
+            new_data = data.dataloader.get(k, raw=True)
+            new_batch = np.array(new_data.batch)
+            endings[i] = new_batch[0, 4, :]
+            label.append(0)
+        else:
+            label.append(1)
+    # Return what's needed for keras
+    return [last_sentences, endings], np.array(label)
 
-    def __call__(self, data):
-        batch = np.array(data.batch)
-        last_sentences = batch[:, 3, :]
-        endings = batch[:, 4, :]
-        label = []
-        # Randomly choose a bad ending
-        for batch in range(len(batch)):
-            if random.random() > 0.5:
-                k = random.randint(0, len(data.dataloader)-1)
-                new_data = data.dataloader.get(k, raw=True)
-                new_batch = np.array(new_data.batch)
-                endings[batch] = new_batch[0, 4, :]
-                label.append(0)
-            else:
-                label.append(1)
-        print(last_sentences)
-        return [last_sentences, endings], np.array(label)
+
+def output_fn_test(data):
+    batch = np.array(data.batch)
+    last_sentences = batch[:, 3, :]
+    ending_1 = batch[:, 4, :]
+    ending_2 = batch[:, 5, :]
+    correct_ending = data.label
+    endings = ending_2[:]
+    # correct ending if 1 --> if 2 true get 2 - 1 = 1, if 1 true get 1 - 1 = 0
+    label = np.array(correct_ending) - 1
+    if random.random() > 0.5:
+        endings = ending_1[:]
+        label = 1 - label
+    # Return what's needed for keras
+    return [last_sentences, endings], label
 
 
 def keras_model(config):
     # Layers
-    dense_layer_1 = keras.layers.Dense(100, activation='relu')
-    dense_layer_2 = keras.layers.Dense(20, activation='relu')
-    dense_layer_3 = keras.layers.Dense(2, activation='relu')
+    dense_layer_1 = keras.layers.Dense(300, activation='relu')
+    dense_layer_2 = keras.layers.Dense(100, activation='relu')
+    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
 
     # Inputs
-    last_sentence = keras.layers.Input(shape=config.sent2vec.embedding_size)
-    ending = keras.layers.Input(shape=config.sent2vec.embedding_size)
+    last_sentence = keras.layers.Input(shape=(config.sent2vec.embedding_size,))
+    ending = keras.layers.Input(shape=(config.sent2vec.embedding_size,))
 
     # Graph
-    inputs = keras.layers.Add()([last_sentence, ending])
+    inputs = keras.layers.Concatenate()([last_sentence, ending])
     output = keras.layers.Dropout(0.2)(dense_layer_1(inputs))
     output = keras.layers.Dropout(0.2)(dense_layer_2(output))
-    output = keras.layers.Dropout(0.2)(dense_layer_3(output))
+    output = dense_layer_3(output)
 
     # Model
     model = keras.models.Model(inputs=[last_sentence, ending], outputs=[output])
-    model.compile(optimizer="adams", loss="categorical_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
 
     return model
 
@@ -74,8 +86,34 @@ def main(config, training_set, testing_set):
     preprocess_fn = Preprocess(sent2vec_model)
 
     training_set.set_preprocess_fn(preprocess_fn)
+    testing_set.set_preprocess_fn(preprocess_fn)
 
-    output_fn = Dataloader()
-    training_set.set_output_fn(output_fn)
+    training_set.set_output_fn(output_fn_train)
+    testing_set.set_output_fn(output_fn_test)
 
-    print(training_set.get(1, random=True))
+    generator_training = training_set.get_batch(config.batch_size, config.n_epochs, random=True)
+    generator_testing = testing_set.get_batch(config.batch_size, config.n_epochs, random=True)
+
+    cloze_model = keras_model(config)
+
+    verbose = 0 if not config.debug else 1
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Callbacks
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '/', histogram_freq=0,
+                                              batch_size=config.batch_size,
+                                              write_graph=False,
+                                              write_grads=True)
+
+    model_path = os.path.abspath(
+        os.path.join(os.curdir, './builds/' + timestamp + '/'))
+    os.mkdir(model_path)
+
+    saver = keras.callbacks.ModelCheckpoint(model_path + 'sentiment_checkpoint_epoch-{epoch:02d}.hdf5',
+                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+
+    cloze_model.fit_generator(generator_training, steps_per_epoch=len(training_set) / config.batch_size,
+                              epochs=config.n_epochs,
+                              verbose=verbose,
+                              validation_data=generator_testing,
+                              validation_steps=len(testing_set) / config.batch_size,
+                              callbacks=[tensorboard, saver])

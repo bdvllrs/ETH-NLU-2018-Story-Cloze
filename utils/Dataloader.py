@@ -18,9 +18,10 @@ class Data:
     - config: config object
     """
 
-    def __init__(self, batch, dataloader):
+    def __init__(self, batch, dataloader, label=None):
         self.batch = batch
         self.dataloader = dataloader
+        self.label = label
 
     def __getitem__(self, item):
         return self.get(item)
@@ -188,14 +189,18 @@ class Dataloader:
         lines = self.original_lines[:] if no_preprocess else self.preprocessed_lines
 
         batch = []
+        label = []
         sentiment_batch = []
         for k in range(number):
             i = (index + k) % len(self)
             line_index = i if not random else self.line_number[i]
             batch.append(lines[line_index])
+            if self.testing_data:
+                # No preprocessing for the label
+                label.append(int(self.original_lines[line_index][6][0]))
             if self.sentiments is not None:
                 sentiment_batch.append(self.sentiment_lines[line_index])
-        batch = Data(batch, self)
+        batch = Data(batch, self, label=label)
         return self.output_fn(batch) if not raw else batch
 
     def get_batch(self, batch_size, epochs, random=True):
@@ -206,7 +211,7 @@ class Dataloader:
         :param random: if the sentences should be randomized.
         :return: generator
         """
-        for _ in epochs:
+        for _ in range(epochs):
             for k in range(0, len(self), batch_size):
                 yield self.get(k, batch_size, random)
 
