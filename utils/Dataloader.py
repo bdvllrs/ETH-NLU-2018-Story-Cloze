@@ -196,7 +196,8 @@ class Dataloader:
             i = (index + k) % len(self)
             line_index = i if not random else self.line_number[i]
             batch.append(lines[line_index])
-            sentiment_batch.append(self.sentiment_lines[line_index])
+            if self.sentiments is not None:
+                sentiment_batch.append(self.sentiment_lines[line_index])
         batch = Data(batch, self.testing_data, self.original_lines, self.preprocessed_lines, sentiment_batch,
                      self.config)
         return self.output_fn(batch)
