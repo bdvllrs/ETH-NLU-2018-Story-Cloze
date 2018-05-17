@@ -6,7 +6,7 @@ import tensorflow as tf
 def model(sentiment_data):
     model = keras.models.Sequential([
         keras.layers.Embedding(sentiment_data.vocab_size, 200),
-        keras.layers.Bidirectional(keras.layers.GRU(100, dropout=0.2, recurrent_dropout=0.2, return_sequences=True)),
+        keras.layers.Bidirectional(keras.layers.GRU(100, dropout=0.2, recurrent_dropout=0.2)),
         keras.layers.Dense(50, activation='relu'),
         keras.layers.Dropout(0.2),
         keras.layers.Dense(2, activation='sigmoid')

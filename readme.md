@@ -58,3 +58,5 @@ elif config.model == "some_name":
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>
 - Esteban Lanter <[elSomewhere](https://github.com/elSomewhere)>
+- [A Corpus and Cloze Evaluation for Deeper Understanding of Commonsense Stories](https://arxiv.org/abs/1604.01696), 2016 <br>
+_Mostafazadeh, Nasrin  and  Chambers, Nathanael  and  He, Xiaodong  and  Parikh, Devi  and  Batra, Dhruv  and  Vanderwende, Lucy  and  Kohli, Pushmeet  and  Allen, James_ 
