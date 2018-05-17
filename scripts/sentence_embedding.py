@@ -85,9 +85,10 @@ def train_fn(config, training_set, sess, epoch, k, summary_op, train_writer):
     """
     batch, sentiments = training_set.get(k, config.batch_size, random=True, with_sentiments=True)
     # Get random endings to train bad endings
-    bad_ending, bad_ending_sentiments = training_set.get(k, config.batch_size, random=True, with_sentiments=True)
+
+    bad_ending, bad_ending_sentiments = training_set.get(k+1, config.batch_size, random=True, with_sentiments=True)
     bad_ending = bad_ending[:, 4, :]
-    bad_ending_sentiments = bad_ending_sentiments[:, 4]
+    bad_ending_sentiments = bad_ending_sentiments[:, 8:10]
     last_sentences, right_ending = batch[:, 3, :], batch[:, 4, :]
     batch1, label1, batch2, label2, sent1, sent2 = mix_batches(right_ending, bad_ending, sentiments,
                                                                bad_ending_sentiments)

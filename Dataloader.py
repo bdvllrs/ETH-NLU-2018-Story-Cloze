@@ -83,7 +83,7 @@ class Dataloader:
         for k, word in enumerate(self.index_to_word):
             self.word_to_index[word] = k
 
-    def get(self, index, number=1, random=False, no_preprocess=False, with_sentiments=False):
+    def get(self, index, number=1, random=False, no_preprocess=False, with_sentiments=False, no_padding=False):
         """
         Get some lines
         :param index: index of the line
@@ -94,26 +94,32 @@ class Dataloader:
         assert with_sentiments and self.sentiments is not None, "Please use set_sentiments to use sentiment analysis."
         preprocess_fn = lambda x: self.preprocess(x, no_preprocess)
         preprocess_labels_fn = lambda x: self.preprocess_labels(x, no_preprocess)
+        index = index % len(self)
+        ending = (index + number - 1) % len(self) + 1
+        if ending < index:
+            index += number
+            index = index % len(self)
+            ending = (index + number - 1) % len(self) + 1
         if not random:
-            batch = list(map(preprocess_fn, self.original_lines[index:index + number]))
+            batch = list(map(preprocess_fn, self.original_lines[index:ending]))
             if with_sentiments:
                 batch_sentiments = np.array([[i for t in l for i in t] for l in
                                              list(map(self.get_sentiment, self.original_lines[index:index + number]))])
-            max_length = self.unify_batch_length(batch)
+            max_length = self.unify_batch_length(batch, no_preprocess=no_preprocess)
             if self.testing_data:
                 batch_labels = list(map(preprocess_labels_fn, self.original_lines[index:index + number]))
                 label_sentences = list(map(lambda x: x[0], batch_labels))
                 self.unify_batch_length(label_sentences, max_length)
                 label_choice = list(map(lambda x: x[1], batch_labels))
         else:
-            indexes = self.lines[index:index + number]
+            indexes = self.lines[index:ending]
             lines = []
             for i in indexes:
                 lines.append(self.original_lines[i])
             batch = list(map(preprocess_fn, lines))
             if with_sentiments:
                 batch_sentiments = np.array([[i for t in l for i in t] for l in list(map(self.get_sentiment, lines))])
-            max_length = self.unify_batch_length(batch)
+            max_length = self.unify_batch_length(batch, no_preprocess=no_preprocess)
             if self.testing_data:
                 batch_labels = list(map(preprocess_labels_fn, lines))
                 label_sentences = list(map(lambda x: x[0], batch_labels))
@@ -140,11 +146,12 @@ class Dataloader:
             return np.array(batch), batch_sentiments
         return np.array(batch)
 
-    def unify_batch_length(self, batch, max_length=None):
+    def unify_batch_length(self, batch, max_length=None, no_preprocess=False, no_padding=False):
         """
         Set all sequences in batch to the same length
         Get max length of the batch
         """
+        preprocess_fn = lambda w, x: x if no_preprocess else self.preprocess_fn
         if max_length is None:
             max_length = 0
             for story in batch:
@@ -154,7 +161,9 @@ class Dataloader:
         # Set max length to all sequences
         for k, story in enumerate(batch):
             for i, sentence in enumerate(story):
-                batch[k][i] += self.preprocess_fn(self.word_to_index, ['<pad>'] * (max_length - len(sentence)))
+                if max_length - len(sentence) > 0:
+                    # print('padding')
+                    batch[k][i] += preprocess_fn(self.word_to_index, ['<pad>'] * (max_length - len(sentence)))
         return max_length
 
     def preprocess_labels(self, line, no_preprocess=False):
@@ -194,3 +203,10 @@ class Dataloader:
                 sentence = self.preprocess_fn(self.word_to_index, sentence)
             tokenized_sentences.append(sentence)
         return tokenized_sentences
+
+    def batch_generator(self, batch_size, with_sentiments=False, preprocess=None):
+        if preprocess is None:
+            preprocess = lambda *x: (x[0], x[1])
+        while True:
+            for k in range(len(self)):
+                yield preprocess(*self.get(k, batch_size, random=True, with_sentiments=with_sentiments))

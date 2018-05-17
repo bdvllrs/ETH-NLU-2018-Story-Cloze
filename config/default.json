@@ -2,9 +2,10 @@
   "vocab_size": 20000,
   "embedding_size": 100,
   "hidden_size": 100,
-  "batch_size": 64,
+  "batch_size": 16,
+  "max_size": 25,
   "learning_rate": 0.01,
-  "n_epochs": 10,
+  "n_epochs": 10000,
   "save_model_every": 10,
   "test_every": 2,
 
@@ -15,5 +16,10 @@
   "sent2vec": {
     "model": null,
     "embedding_size": 500
+  },
+
+  "sentiment_analysis": {
+    "vocab_size": 20000,
+    "max_length": 50
   }
 }
