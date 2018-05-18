@@ -4,3 +4,4 @@ tqdm
 nltk
 numpy
 tensorflow
+tensorflow_hub

@@ -12,9 +12,10 @@ class Config:
             with open(config_filepath, 'r') as f:
                 self.config = json.load(f)
             for file in files:
-                config_filepath = os.path.abspath(os.path.join(filepath, file))
-                with open(config_filepath, 'r') as f:
-                    self.config = {**self.config, **json.load(f)}
+                if file[-4:] == 'json':
+                    config_filepath = os.path.abspath(os.path.join(filepath, file))
+                    with open(config_filepath, 'r') as f:
+                        self.config = {**self.config, **json.load(f)}
         elif config is not None:
             self.config = config
         if args is not None:

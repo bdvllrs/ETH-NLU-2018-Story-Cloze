@@ -18,8 +18,9 @@ class Data:
     - config: config object
     """
 
-    def __init__(self, batch, dataloader, label=None):
+    def __init__(self, batch, sentiment_batch, dataloader, label=None):
         self.batch = batch
+        self.sentiments = sentiment_batch
         self.dataloader = dataloader
         self.label = label
 
@@ -200,7 +201,7 @@ class Dataloader:
                 label.append(int(self.original_lines[line_index][6][0]))
             if self.sentiments is not None:
                 sentiment_batch.append(self.sentiment_lines[line_index])
-        batch = Data(batch, self, label=label)
+        batch = Data(batch, sentiment_batch, self, label=label)
         return self.output_fn(batch) if not raw else batch
 
     def get_batch(self, batch_size, epochs, random=True):

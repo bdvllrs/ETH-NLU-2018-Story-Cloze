@@ -1,13 +1,12 @@
 import datetime
 import keras
 import os
-import tensorflow as tf
 
 
 def model(sentiment_data):
     model = keras.models.Sequential([
-        keras.layers.Embedding(sentiment_data.vocab_size, 100),
-        keras.layers.Bidirectional(keras.layers.GRU(500, dropout=0.2, recurrent_dropout=0.2)),
+        keras.layers.Embedding(sentiment_data.vocab_size, 5),
+        keras.layers.GRU(5, dropout=0.5, recurrent_dropout=0.5),
         keras.layers.Dense(2, activation='sigmoid')
     ])
 
@@ -15,13 +14,13 @@ def model(sentiment_data):
     return model
 
 
-def main(config, training_set, testing_set, sentiment_data):
+def main(config, sentiment_data):
     sentiment_model = model(sentiment_data)
 
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Callbacks
-    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '/', histogram_freq=0,
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/sentiment-' + timestamp + '/', histogram_freq=0,
                                               batch_size=config.batch_size,
                                               write_graph=False,
                                               write_grads=True)

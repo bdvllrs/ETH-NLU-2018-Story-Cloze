@@ -1,125 +1,128 @@
+import os
 import random
-
-import tensorflow as tf
+import datetime
+import keras
 import numpy as np
-from models import SentenceEmbedding
-from utils import train_test
 import sent2vec
 
 
 class Preprocess:
+    """
+    Preprocess to apply to the dataset
+    """
+
     def __init__(self, sent2vec_model):
         self.sent2vec_model = sent2vec_model
 
     def __call__(self, word_to_index, sentence):
-        # Get sentence level embedding with sent2vec
         sentence = self.sent2vec_model.embed_sentence(' '.join(sentence))
         return sentence
 
 
-def mix_batches(right_ending, wrong_ending, sentiments, bad_ending_sentiment):
-    batch1 = np.zeros(right_ending.shape)
-    batch2 = np.zeros(wrong_ending.shape)
-    label1 = np.zeros(len(right_ending))
-    label2 = np.zeros(len(right_ending))
-    sent1 = sentiments[:]
-    sent2 = sentiments[:]
-    for k in range(len(right_ending)):
+def output_fn_train(data):
+    batch = np.array(data.batch)
+    last_sentences = batch[:, 3, :]
+    endings = batch[:, 4, :]
+    sentiments = np.array(data.sentiments)
+    label = []
+    # Randomly choose a bad ending
+    for i in range(len(batch)):
+        # Only 50% of the time
         if random.random() > 0.5:
-            batch1[k] = right_ending[k]
-            label1[k] = 1
-            batch2[k] = wrong_ending[k]
-            label2[k] = 0
-            sent2[k, -2:] = bad_ending_sentiment[k]
+            k = random.randint(0, len(data.dataloader) - 1)
+            new_data = data.dataloader.get(k, raw=True)
+            new_batch = np.array(new_data.batch)
+            endings[i] = new_batch[0, 4, :]
+            label.append(0)
+            sentiments[i] = np.array(new_data.sentiments)[0, :]
         else:
-            batch2[k] = right_ending[k]
-            label2[k] = 1
-            batch1[k] = wrong_ending[k]
-            label1[k] = 0
-            sent1[k, -2:] = bad_ending_sentiment[k]
-    return batch1, label1, batch2, label2, sent1, sent2
+            label.append(1)
+    # Return what's needed for keras
+    return [last_sentences, endings, sentiments], np.array(label)
 
 
-def test_fn(config, testing_set, sess, epoch, k):
-    """
-    Function executed for each batch for testing
-    :param config:
-    :param testing_set:
-    :param sess:
-    :param epoch:
-    :param k:
-    """
-    batch_endings1, batch_endings2, correct_ending, sent1, sent2 = testing_set.get(k, config.batch_size,
-                                                                                   random=True, with_sentiments=True)
-    sentence1, ending1 = batch_endings1[:, 3, :], batch_endings1[:, 4, :]
-    sentence2, ending2 = batch_endings2[:, 3, :], batch_endings2[:, 4, :]
-    output = [None, None]
-    output[0] = sess.run(
-        'sentence_embedding/output:0',
-        {'sentence_embedding/last-sentence:0': sentence1,
-         'sentence_embedding/sentiment:0': sent1,
-         'sentence_embedding/ending:0': ending1})
-    output[1] = sess.run(
-        'sentence_embedding/output:0',
-        {'sentence_embedding/last-sentence:0': sentence2,
-         'sentence_embedding/sentiment:0': sent2,
-         'sentence_embedding/ending:0': ending2})
-    success = 0
-    for b in range(config.batch_size):
-        if output[correct_ending[b]][b] > output[1 - correct_ending[b]][b]:
-            success += 1
-    success = 0
-    return config.batch_size, success
+def output_fn_test(data):
+    batch = np.array(data.batch)
+    last_sentences = batch[:, 3, :]
+    ending_1 = batch[:, 4, :]
+    ending_2 = batch[:, 5, :]
+    sentiments = np.array(data.sentiments)[:, :6]
+    correct_ending = data.label
+    endings = ending_2[:]
+    sentiment_1 = sentiments[:, :5]
+    sentiment_2 = np.concatenate((sentiments[:, :4], sentiments[:, 5:6]), axis=1)
+    sentiments = sentiment_2
+    # correct ending if 1 --> if 2 true get 2 - 1 = 1, if 1 true get 1 - 1 = 0
+    label = np.array(correct_ending) - 1
+    if random.random() > 0.5:
+        endings = ending_1[:]
+        label = 1 - label
+        sentiments = sentiment_1
+    # Return what's needed for keras
+    return [last_sentences, endings, sentiments], label
 
 
-def train_fn(config, training_set, sess, epoch, k, summary_op, train_writer):
-    """
-    Function executed for each batch for training
-    :param config:
-    :param training_set:
-    :param sess:
-    :param epoch:
-    :param k:
-    :param summary_op:
-    :param train_writer:
-    """
-    batch, sentiments = training_set.get(k, config.batch_size, random=True, with_sentiments=True)
-    # Get random endings to train bad endings
+def keras_model(config):
+    # Layers
+    dense_layer_1 = keras.layers.Dense(500, activation='relu')
+    dense_layer_2 = keras.layers.Dense(100, activation='relu')
+    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
 
-    bad_ending, bad_ending_sentiments = training_set.get(k+1, config.batch_size, random=True, with_sentiments=True)
-    bad_ending = bad_ending[:, 4, :]
-    bad_ending_sentiments = bad_ending_sentiments[:, 8:10]
-    last_sentences, right_ending = batch[:, 3, :], batch[:, 4, :]
-    batch1, label1, batch2, label2, sent1, sent2 = mix_batches(right_ending, bad_ending, sentiments,
-                                                               bad_ending_sentiments)
-    _, summary = sess.run(
-        ['sentence_embedding/optimize/optimizer', summary_op],
-        {'sentence_embedding/last-sentence:0': last_sentences,
-         'sentence_embedding/ending:0': batch1,
-         'sentence_embedding/sentiment:0': sent1,
-         'sentence_embedding/optimize/label:0': label1})  # High label for this one as it is a right ending
-    _, summary2 = sess.run(
-        ['sentence_embedding/optimize/optimizer', summary_op],
-        {'sentence_embedding/last-sentence:0': last_sentences,
-         'sentence_embedding/ending:0': batch2,
-         'sentence_embedding/sentiment:0': sent2,
-         'sentence_embedding/optimize/label:0': label2})  # High label for this one as it is a right ending
-    train_writer.add_summary(summary, epoch * len(training_set) + k)
-    train_writer.add_summary(summary2, epoch * len(training_set) + k + 0.5)
+    # Inputs
+    last_sentence = keras.layers.Input(shape=(config.sent2vec.embedding_size,))
+    ending = keras.layers.Input(shape=(config.sent2vec.embedding_size,))
+    sentiments = keras.layers.Input(shape=(5,))
+
+    # Graph
+    inputs = keras.layers.Concatenate()([last_sentence, ending, sentiments])
+    # inputs = sentiments
+    output = keras.layers.Dropout(0.3)(dense_layer_1(inputs))
+    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
+    output = dense_layer_3(output)
+
+    # Model
+    model = keras.models.Model(inputs=[last_sentence, ending, sentiments], outputs=[output])
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+
+    return model
 
 
 def main(config, training_set, testing_set):
     assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
-    model = sent2vec.Sent2vecModel()
-    model.load_model(config.sent2vec.model)
-    preprocess = Preprocess(model)
-    training_set.set_preprocess_fn(preprocess)
-    testing_set.set_preprocess_fn(preprocess)
+    sent2vec_model = sent2vec.Sent2vecModel()
+    sent2vec_model.load_model(config.sent2vec.model)
 
-    sentence_embedding = SentenceEmbedding(config)
-    sentence_embedding()
-    sentence_embedding.optimize()
+    preprocess_fn = Preprocess(sent2vec_model)
 
-    tf.summary.scalar("cross_entropy", sentence_embedding.cross_entropy)
+    training_set.set_preprocess_fn(preprocess_fn)
+    testing_set.set_preprocess_fn(preprocess_fn)
 
-    train_test(config, training_set, testing_set, test_fn, train_fn)
+    training_set.set_output_fn(output_fn_train)
+    testing_set.set_output_fn(output_fn_test)
+
+    generator_training = training_set.get_batch(config.batch_size, config.n_epochs, random=True)
+    generator_testing = testing_set.get_batch(config.batch_size, config.n_epochs, random=True)
+
+    cloze_model = keras_model(config)
+
+    verbose = 0 if not config.debug else 1
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Callbacks
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/sentence-embedding-' + timestamp + '/', histogram_freq=0,
+                                              batch_size=config.batch_size,
+                                              write_graph=False,
+                                              write_grads=True)
+
+    model_path = os.path.abspath(
+        os.path.join(os.curdir, './builds/' + timestamp))
+    model_path += '-sentence-embedding_checkpoint_epoch-{epoch:02d}.hdf5'
+
+    saver = keras.callbacks.ModelCheckpoint(model_path,
+                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+
+    cloze_model.fit_generator(generator_training, steps_per_epoch=len(training_set) / config.batch_size,
+                              epochs=config.n_epochs,
+                              verbose=verbose,
+                              validation_data=generator_testing,
+                              validation_steps=len(testing_set) / config.batch_size,
+                              callbacks=[tensorboard, saver])

@@ -19,7 +19,7 @@
   },
 
   "sentiment_analysis": {
-    "vocab_size": 20000,
+    "vocab_size": 5000,
     "max_length": 100
   }
 }

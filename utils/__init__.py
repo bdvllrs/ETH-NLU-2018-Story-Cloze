@@ -3,3 +3,4 @@ from .Config import Config
 from .SentimentsSimple import SentimentsSimple
 from .Sentiments import Sentiments
 from .Dataloader import Dataloader, Data
+from .SNLIDataloader import SNLIDataloader
