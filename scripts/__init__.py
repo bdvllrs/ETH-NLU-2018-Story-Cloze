@@ -2,7 +2,7 @@ from .scheduler import main as scheduler_main
 from .vanilla_seq2seq import main as seq2seq_main
 from .sentence_embedding import main as sentence_embedding_main
 from .sentiment_analysis import main as sentiment_analysis_main
-from .entailment_v1 import main as entailement_main
+from .entailment_v2 import main as entailement_main
 
 
 def run(config, training_set, testing_set, sentiments):

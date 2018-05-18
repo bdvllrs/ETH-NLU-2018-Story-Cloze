@@ -38,6 +38,32 @@ def output_fn(batch):
     return [batch[:, 1], batch[:, 2]], np.array(list(batch[:, 0]))
 
 
+class ElmoEmbedding:
+    def __init__(self, elmo_model):
+        self.elmo_model = elmo_model
+        self.__name__ = "elmo_embeddings"
+
+    def __call__(self, x):
+        return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
+            "default"]
+
+
+# class Elmo(keras.engine.topology.Layer):
+#     def __init__(self, elmo_model, **kwargs):
+#         self.elmo_model = elmo_model
+#         super(Elmo, self).__init__(**kwargs)
+#
+#     def build(self, input_shape):
+#         super(Elmo, self).build(input_shape)  # Be sure to call this at the end
+#
+#     def call(self, x):
+#         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
+#             "default"]
+#
+#     def compute_output_shape(self, input_shape):
+#         return (input_shape[0], 1024)
+
+
 def model(sess, config):
     if config.debug:
         print('Importing Elmo module...')
@@ -48,8 +74,12 @@ def model(sess, config):
     sess.run(tf.tables_initializer())
 
     # TODO: Try with the `word_emb` to have all embeddings (size: max_length, 1024)
-    elmo_embeddings = lambda x: elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-        "default"]
+    elmo_embeddings = ElmoEmbedding(elmo_model)
+    # elmo_embeddings = lambda x: elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
+    #     "default"]
+
+    # def elmo_embeddings(x):
+    #     return elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)["default"]
 
     dense_layer_1 = keras.layers.Dense(500, activation='relu')
     dense_layer_2 = keras.layers.Dense(100, activation='relu')
@@ -95,7 +125,7 @@ def main(config):
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Callbacks
-    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/entailmentv1-' + timestamp + '/', histogram_freq=0,
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv1/', histogram_freq=0,
                                               batch_size=config.batch_size,
                                               write_graph=False,
                                               write_grads=True)
@@ -107,9 +137,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=100,
+    keras_model.fit_generator(generator_training, steps_per_epoch=2,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=len(dev_set) / config.batch_size,
+                              validation_steps=1,
                               callbacks=[tensorboard, saver])
