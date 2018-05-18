@@ -39,7 +39,11 @@ def output_fn(batch):
 
 
 def model(sess, config):
+    if config.debug:
+        print('Importing Elmo module...')
     elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+    if config.debug:
+        print('Imported.')
     sess.run(tf.global_variables_initializer())
     sess.run(tf.tables_initializer())
 
@@ -103,7 +107,7 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=len(train_set) / config.batch_size,
+    keras_model.fit_generator(generator_training, steps_per_epoch=100,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,

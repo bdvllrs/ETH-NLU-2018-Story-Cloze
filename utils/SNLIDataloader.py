@@ -84,6 +84,7 @@ class SNLIDataloader:
         for epoch in range(n_epochs):
             for k in range(0, len(self), batch_size):
                 yield self.get(k, batch_size, random)
+            self.shuffle_lines()
 
 
 if __name__ == '__main__':
