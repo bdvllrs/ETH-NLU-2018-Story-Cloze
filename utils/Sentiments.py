@@ -109,6 +109,6 @@ class Sentiments:
                     batch_label.append(label)
                 for b in range(batch_size):
                     batch[b] += [self.word_to_index['<pad>']] * (max_length - len(batch[b]))
-                    # batch[b] = batch[b][:self.config.sentiment_analysis.max_length]
+                    batch[b] = batch[b][:self.config.sentiment_analysis.max_length]
                 yield np.array(batch), np.array(batch_label)
 

@@ -20,6 +20,6 @@
 
   "sentiment_analysis": {
     "vocab_size": 20000,
-    "max_length": 50
+    "max_length": 100
   }
 }
