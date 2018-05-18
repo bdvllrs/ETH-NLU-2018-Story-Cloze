@@ -90,9 +90,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=2,
+    keras_model.fit_generator(generator_training, steps_per_epoch=100,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=1,
+                              validation_steps=len(test_set) / config.batch_size,
                               callbacks=[tensorboard, saver])
