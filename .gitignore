@@ -6,6 +6,7 @@ builds/
 *.word2vec
 config/*.json
 setup.sh
+setup.py
 data/
 *.bin
 
