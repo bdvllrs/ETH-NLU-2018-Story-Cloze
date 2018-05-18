@@ -27,10 +27,9 @@ def main(config, training_set, testing_set, sentiment_data):
                                               write_grads=True)
 
     model_path = os.path.abspath(
-        os.path.join(os.curdir, './builds/' + timestamp + '/'))
-    os.mkdir(model_path)
+        os.path.join(os.curdir, './builds/' + timestamp + '-'))
 
-    model_path = os.path.join(model_path, '/sentiment_checkpoint_epoch-{epoch:02d}.hdf5')
+    model_path += 'sentiment_checkpoint_epoch-{epoch:02d}.hdf5'
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
