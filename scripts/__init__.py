@@ -3,6 +3,7 @@ from .vanilla_seq2seq import main as seq2seq_main
 from .sentence_embedding import main as sentence_embedding_main
 from .sentiment_analysis import main as sentiment_analysis_main
 from .entailment_v2 import main as entailement_main
+from .type_translation import main as type_translation_main
 
 
 def run(config, training_set, testing_set, sentiments):
@@ -17,5 +18,7 @@ def run(config, training_set, testing_set, sentiments):
         sentiment_analysis_main(config, sentiments)
     elif config.model == "entailment":
         entailement_main(config)
+    elif config.model == "type_translation":
+        type_translation_main(config)
     else:
         raise Exception('Unknown model ' + str(config.model) + '.')

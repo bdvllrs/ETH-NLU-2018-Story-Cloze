@@ -9,6 +9,7 @@ setup.sh
 setup.py
 data/
 *.bin
+*.dat
 
 # Add default config
 !config/default.json
