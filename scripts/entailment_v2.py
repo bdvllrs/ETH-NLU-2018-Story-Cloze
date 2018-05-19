@@ -28,7 +28,7 @@ class Preprocess:
         if line['gold_label'] == 'contradiction':
             label = 0
         elif line['gold_label'] == 'neutral':
-            label = 0
+            label = 1
         sentence1 = list(self.sent2vec.embed_sentence(' '.join(word_tokenize(line['sentence1']))))
         sentence2 = list(self.sent2vec.embed_sentence(' '.join(word_tokenize(line['sentence2']))))
         output = [label, sentence1, sentence2]
@@ -44,7 +44,7 @@ class PreprocessTest:
         self.sent2vec_model = sent2vec_model
 
     def __call__(self, word_to_index, sentence):
-        sentence = self.sent2vec_model.embed_sentence(' '.join(sentence))
+        sentence = ' '.join(sentence)
         return sentence
 
 
@@ -53,23 +53,33 @@ def output_fn(_, batch):
     return [np.array(list(batch[:, 1])), np.array(list(batch[:, 2]))], np.array(list(batch[:, 0]))
 
 
-def output_fn_test(data):
-    batch = np.array(data.batch)
-    last_sentences = batch[:, 3, :]
-    ending_1 = batch[:, 4, :]
-    ending_2 = batch[:, 5, :]
-    endings = ending_2[:]
-    correct_ending = data.label
-    label = np.array(correct_ending) - 1
-    final_label = []
-    # correct ending if 1 --> if 2 true get 2 - 1 = 1, if 1 true get 1 - 1 = 0
-    if random.random() > 0.5:
-        endings = ending_1[:]
-        label = 1 - label
-    for b in range(len(label)):
-        final_label.append([1, 0, 0] if label[b] == 1 else [0, 0.5, 0.5])
-    # Return what's needed for keras
-    return [last_sentences, endings], np.array(final_label)
+class OutputFnTest:
+    def __init__(self, sent2vec, config):
+        self.sent2vec = sent2vec
+        self.config = config
+
+    def __call__(self, data):
+        batch = data.batch
+        sentence_batch = []
+        ending_1 = []
+        ending_2 = []
+        for b in range(len(batch)):
+            sentence = batch[b][0] + ' ' + batch[b][1] + ' ' + batch[b][2] + ' ' + batch[b][3]
+            sentence_batch.append(self.sent2vec.embed_sentence(sentence))
+            ending_1.append(self.sent2vec.embed_sentence(batch[b][4]))
+            ending_2.append(self.sent2vec.embed_sentence(batch[b][5]))
+        endings = ending_2[:]
+        correct_ending = data.label
+        label = np.array(correct_ending) - 1
+        final_label = []
+        # correct ending if 1 --> if 2 true get 2 - 1 = 1, if 1 true get 1 - 1 = 0
+        if random.random() > 0.5:
+            endings = ending_1[:]
+            label = 1 - label
+        for b in range(len(label)):
+            final_label.append([0.5, 0.5, 0] if label[b] == 1 else [0, 0, 1])
+        # Return what's needed for keras
+        return [np.array(sentence_batch), np.array(endings)], np.array(final_label)
 
 
 def model(config):
@@ -142,6 +152,8 @@ def test(config, testing_set):
 
     preprocess_fn = PreprocessTest(sent2vec_model)
     testing_set.set_preprocess_fn(preprocess_fn)
+
+    output_fn_test = OutputFnTest(sent2vec_model, config)
 
     testing_set.set_output_fn(output_fn_test)
 
