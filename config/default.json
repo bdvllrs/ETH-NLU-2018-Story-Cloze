@@ -10,6 +10,7 @@
   "test_every": 2,
 
   "model": "scheduler",
+  "action": "train",
 
   "debug": true,
 
