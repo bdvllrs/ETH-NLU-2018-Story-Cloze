@@ -72,6 +72,8 @@ of the `model` value to the value of the Script `slug` attribute.
 
 By default, the `action` config value is `train`. Tu use the `test` method, use the value `test`.
 
+You can use the attribute `self.config` which is automatically passed to the Script class.
+
 ## Model list
 - `scheduler`
 - `seq2seq`
