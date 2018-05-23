@@ -50,7 +50,7 @@ Some values can also be overridden by passing an argument when executing.
 
 ## Add a script
 To create a new script, add a file in the `scripts` folder and add this code snippet:
-```pyhon
+```python
 from scripts import DefaultScript
 
 
