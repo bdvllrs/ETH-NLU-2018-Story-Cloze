@@ -15,6 +15,15 @@ import sent2vec
 import numpy as np
 from utils import SNLIDataloader
 from nltk import word_tokenize
+from scripts import DefaultScript
+
+
+class Script(DefaultScript):
+
+    slug = 'type_translation'
+
+    def train(self):
+        main(self.config)
 
 
 class Preprocess:

@@ -4,6 +4,24 @@ import datetime
 import keras
 import numpy as np
 import sent2vec
+from utils import Dataloader
+from scripts import DefaultScript
+
+
+class Script(DefaultScript):
+
+    slug = 'scheduler'
+
+    def train(self):
+        training_set = Dataloader(self.config)
+        training_set.load_dataset('./data/train.bin')
+        training_set.load_vocab('./default.voc', self.config.vocab_size)
+
+        testing_set = Dataloader(self.config, testing_data=True)
+        testing_set.load_dataset('data/test.bin')
+        testing_set.load_vocab('./default.voc', self.config.vocab_size)
+
+        main(self.config, training_set, testing_set)
 
 
 class Preprocess:
@@ -117,7 +135,7 @@ def main(config, training_set, testing_set):
     model_path += '-scheduler_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+                                            monitor='val_loss', verbose=verbose, save_best_only=True)
 
     cloze_model.fit_generator(generator_training, steps_per_epoch=len(training_set) / config.batch_size,
                               epochs=config.n_epochs,

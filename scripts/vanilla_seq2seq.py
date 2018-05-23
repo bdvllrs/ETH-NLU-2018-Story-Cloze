@@ -3,6 +3,24 @@ import numpy as np
 import tensorflow as tf
 from models import VanillaSeq2SeqEncoder, scheduler_preprocess, scheduler_get_labels
 from utils import load_embedding
+from utils import Dataloader
+from scripts import DefaultScript
+
+
+class Script(DefaultScript):
+
+    slug = 'seq2seq'
+
+    def train(self):
+        training_set = Dataloader(self.config)
+        training_set.load_dataset('./data/train.bin')
+        training_set.load_vocab('./default.voc', self.config.vocab_size)
+
+        testing_set = Dataloader(self.config, testing_data=True)
+        testing_set.load_dataset('data/test.bin')
+        testing_set.load_vocab('./default.voc', self.config.vocab_size)
+
+        main(self.config, training_set, testing_set)
 
 
 def main(config, training_set, testing_set):

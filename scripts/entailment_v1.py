@@ -18,6 +18,15 @@ import tensorflow_hub as hub
 import numpy as np
 from utils import SNLIDataloader
 from nltk import word_tokenize
+from scripts import DefaultScript
+
+
+class Script(DefaultScript):
+
+    slug = 'entailment_v1'
+
+    def train(self):
+        main(self.config)
 
 
 def preprocess_fn(line):
@@ -33,7 +42,7 @@ def preprocess_fn(line):
     return output
 
 
-def output_fn(batch):
+def output_fn(_, batch):
     batch = np.array(batch, dtype=object)
     return [batch[:, 1], batch[:, 2]], np.array(list(batch[:, 0]))
 
@@ -67,7 +76,7 @@ class ElmoEmbedding:
 def model(sess, config):
     if config.debug:
         print('Importing Elmo module...')
-    elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+    elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=False)
     if config.debug:
         print('Imported.')
     sess.run(tf.global_variables_initializer())

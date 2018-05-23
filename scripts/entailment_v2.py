@@ -16,6 +16,23 @@ import sent2vec
 import numpy as np
 from utils import SNLIDataloader
 from nltk import word_tokenize
+from utils import Dataloader
+from scripts import DefaultScript
+
+
+class Script(DefaultScript):
+
+    slug = 'entailment'
+
+    def train(self):
+        main(self.config)
+
+    def test(self):
+        testing_set = Dataloader(self.config, testing_data=True)
+        testing_set.load_dataset('data/test.bin')
+
+        testing_set.load_vocab('./default.voc', self.config.vocab_size)
+        test(self.config, testing_set)
 
 
 class Preprocess:
@@ -64,7 +81,8 @@ class OutputFnTest:
         ending_1 = []
         ending_2 = []
         for b in range(len(batch)):
-            sentence = batch[b][0] + ' ' + batch[b][1] + ' ' + batch[b][2] + ' ' + batch[b][3]
+            # sentence = batch[b][0] + ' ' + batch[b][1] + ' ' + batch[b][2] + ' ' + batch[b][3]
+            sentence = batch[b][3]
             sentence_batch.append(self.sent2vec.embed_sentence(sentence))
             ending_1.append(self.sent2vec.embed_sentence(batch[b][4]))
             ending_2.append(self.sent2vec.embed_sentence(batch[b][5]))
@@ -77,7 +95,7 @@ class OutputFnTest:
             endings = ending_1[:]
             label = 1 - label
         for b in range(len(label)):
-            final_label.append([0, 1, 0] if label[b] == 1 else [0, 0, 1])
+            final_label.append([1] if label[b] == 1 else [0])
         # Return what's needed for keras
         return [np.array(sentence_batch), np.array(endings)], np.array(final_label)
 
@@ -135,7 +153,7 @@ def main(config):
     model_path += '-entailmentv2_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+                                            monitor='val_loss', verbose=verbose, save_best_only=True)
 
     keras_model.fit_generator(generator_training, steps_per_epoch=100,
                               epochs=config.n_epochs,
@@ -160,7 +178,7 @@ def test(config, testing_set):
     generator_testing = testing_set.get_batch(config.batch_size, config.n_epochs, random=True)
 
     keras_model = keras.models.load_model(
-        './builds/leonhard/2018-05-18 18:31:30-entailmentv2_checkpoint_epoch-708.hdf5')
+        './builds/leonhard/2018-05-19 22:33:08-entailmentv2_checkpoint_epoch-1810.hdf5')
 
     verbose = 0 if not config.debug else 1
 

@@ -1,31 +1,33 @@
-from .scheduler import main as scheduler_main
-from .vanilla_seq2seq import main as seq2seq_main
-from .sentence_embedding import main as sentence_embedding_main
-from .sentiment_analysis import main as sentiment_analysis_main
-from .entailment_v2 import main as entailment_main, test as entailment_test
-from .type_translation import main as type_translation_main
+from os.path import dirname, basename, isfile
+import glob
+
+modules = glob.glob(dirname(__file__)+"/*.py")
+files = ["scripts." + basename(f)[:-3] for f in modules if isfile(f) and not f.endswith('__init__.py')]
 
 
-def run(config, training_set, testing_set, sentiments):
-    print("Loading model", config.model)
-    if config.action == "train":
-        if config.model == "scheduler":
-            scheduler_main(config, training_set, testing_set)
-        elif config.model == "seq2seq":
-            seq2seq_main(config, training_set, testing_set)
-        elif config.model == "sentence_embedding":
-            sentence_embedding_main(config, training_set, testing_set)
-        elif config.model == "sentiment_analysis":
-            sentiment_analysis_main(config, sentiments)
-        elif config.model == "entailment":
-            entailment_main(config)
-        elif config.model == "type_translation":
-            type_translation_main(config)
-        else:
-            raise Exception('Unknown model ' + str(config.model) + '.')
-    else:
-        if config.model == "entailment":
-            entailment_test(config, testing_set)
-        else:
-            raise Exception('Unknown model ' + str(config.model) + '.')
+def run(config):
+    for file in files:
+        try:
+            script = __import__(file, globals(), locals(), ['*'])
+            if script.Script.slug == config.method:
+                script = script.Script(config)
+                if config.method == 'train':
+                    script.train()
+                elif config.method == 'test':
+                    script.test()
+        except:
+            pass
 
+
+class DefaultScript:
+
+    slug = 'default'
+
+    def __init__(self, config):
+        self.config = config
+
+    def train(self):
+        pass
+
+    def test(self):
+        pass

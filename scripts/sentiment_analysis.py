@@ -1,6 +1,17 @@
 import datetime
 import keras
 import os
+from scripts import DefaultScript
+from utils import Sentiments
+
+
+class Script(DefaultScript):
+
+    slug = 'sentiment_analysis_v1'
+
+    def train(self):
+        sentiments = Sentiments(self.config, './data/txt_sentoken')
+        main(self.config, sentiments)
 
 
 def model(sentiment_data):
