@@ -6,14 +6,16 @@ files = ["scripts." + basename(f)[:-3] for f in modules if isfile(f) and not f.e
 
 
 def run(config):
+    print('oui')
     for file in files:
         try:
             script = __import__(file, globals(), locals(), ['*'])
-            if script.Script.slug == config.method:
+            if script.Script.slug == config.model:
+                print('Loading', config.model)
                 script = script.Script(config)
-                if config.method == 'train':
+                if config.action == 'train':
                     script.train()
-                elif config.method == 'test':
+                elif config.action == 'test':
                     script.test()
         except:
             pass
