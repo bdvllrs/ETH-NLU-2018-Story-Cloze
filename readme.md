@@ -25,14 +25,25 @@ Load it from a file with `Dataloader.load_vocab(file, size=-1)`.
 Dataloader.get_batch(batch_size, epochs, random=True)
 ```
 
-## Scheduler
-The goal of this model is to get try to find the order of the story given shuffled sentences.
-It gets 5 shuffled sentences and outputs for each sentences the probability that the sentence is in each position.
-
 ## Config
 The `utils.Config` class imports every json files from a given folder.
 In this project, every json files in the `./config` folder.
 To access a value just get as an object property (e.g. `config.batch_size` for the batch size).
+
+### Checking if a config exists
+You can use `config.is_set(key)` to check if the key is in the config.
+
+Example:
+```json
+{
+  "key1": {
+    "key2": "value"
+  }
+}
+```
+
+To use the `key2` value, you can use `config.key1.key2`. To check if the `key2` value is set, 
+you can do: `config.key1.is_set('key2')`.
 
 ## Edit the configuration
 Do not change the `config/default.json` file, instead add a new file in the `config` folder.
@@ -43,10 +54,6 @@ Some values can also be overridden by passing an argument when executing.
 - `--model [-m] slug of the model to use` 
 - `--action [-a] action to use`
 - `--nthreads [-t] number of threads`
-
-## Project architecture
-- `models` folder of all model classes or functions
-- `scripts` main files to run the model
 
 ## Add a script
 To create a new script, add a file in the `scripts` folder and add this code snippet:
@@ -74,14 +81,13 @@ By default, the `action` config value is `train`. Tu use the `test` method, use 
 
 You can use the attribute `self.config` which is automatically passed to the Script class.
 
-## Model list
-- `scheduler`
-- `seq2seq`
-- `sentence_embedding`
-
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>
 - Esteban Lanter <[elSomewhere](https://github.com/elSomewhere)>
 - [A Corpus and Cloze Evaluation for Deeper Understanding of Commonsense Stories](https://arxiv.org/abs/1604.01696), 2016 <br>
 _Mostafazadeh, Nasrin  and  Chambers, Nathanael  and  He, Xiaodong  and  Parikh, Devi  and  Batra, Dhruv  and  Vanderwende, Lucy  and  Kohli, Pushmeet  and  Allen, James_ 
+- [Unsupervised Learning of Sentence Embeddings using Compositional n-Gram Features NAACL 2018](https://arxiv.org/abs/1703.02507), 
+    _Matteo Pagliardini, Prakhar Gupta, Martin Jaggi,_
+- [A large annotated corpus for learning natural language inference](https://nlp.stanford.edu/pubs/snli_paper.pdf)
+    _Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning_,

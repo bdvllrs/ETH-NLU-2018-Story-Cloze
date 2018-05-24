@@ -1,9 +1,13 @@
+__author__ = "Benjamin Devillers (bdvllrs)"
+__credits__ = ["Benjamin Devillers (bdvllrs)"]
+__license__ = "GPL"
+
 import json
 import os
 
 
 class Config:
-    def __init__(self, file=None, config=None, args=None):
+    def __init__(self, file=None, config=None, args=None, is_set=True):
         if file is not None:
             filepath = os.path.abspath(os.path.join(os.path.curdir, file))
             files = os.listdir(filepath)
@@ -22,14 +26,26 @@ class Config:
             for arg, value in vars(args).items():
                 if arg not in self.config.keys() or value is not None:
                     self.config[arg] = value
+        self._is_set = is_set
 
     def set(self, key, value):
         self.config[key] = value
 
+    def is_set(self, key=None):
+        """
+        Check if the value exists
+        """
+        is_set = True
+        if key is not None:
+            is_set = key in self.config.keys()
+        return self._is_set and is_set
+
     def get(self, item):
-        if type(self.config[item]) == dict:
-            return Config(config=self.config[item])
-        return self.config[item]
+        if self.is_set(item):
+            if type(self.config[item]) == dict:
+                return Config(config=self.config[item])
+            return self.config[item]
+        return Config(is_set=False)
 
     def __str__(self):
         return str(self.config)

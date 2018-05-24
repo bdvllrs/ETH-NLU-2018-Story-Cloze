@@ -31,11 +31,11 @@ class Script(DefaultScript):
 
 def preprocess_fn(line):
     # label = [entailment, neutral, contradiction]
-    label = [1, 0, 0]
+    label = [1]
     if line['gold_label'] == 'contradiction':
-        label = [0, 0, 1]
+        label = [0]
     elif line['gold_label'] == 'neutral':
-        label = [0, 1, 0]
+        label = [1]
     sentence1 = ' '.join(word_tokenize(line['sentence1']))
     sentence2 = ' '.join(word_tokenize(line['sentence2']))
     output = [label, sentence1, sentence2]
@@ -57,45 +57,27 @@ class ElmoEmbedding:
             "default"]
 
 
-# class Elmo(keras.engine.topology.Layer):
-#     def __init__(self, elmo_model, **kwargs):
-#         self.elmo_model = elmo_model
-#         super(Elmo, self).__init__(**kwargs)
-#
-#     def build(self, input_shape):
-#         super(Elmo, self).build(input_shape)  # Be sure to call this at the end
-#
-#     def call(self, x):
-#         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-#             "default"]
-#
-#     def compute_output_shape(self, input_shape):
-#         return (input_shape[0], 1024)
-
-
 def model(sess, config):
     if config.debug:
         print('Importing Elmo module...')
-    elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=False)
+    if config.hub.is_set("cache_dir"):
+        os.environ['TFHUB_CACHE_DIR'] = config.hub.cache_dir
+
+    elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+
     if config.debug:
         print('Imported.')
     sess.run(tf.global_variables_initializer())
     sess.run(tf.tables_initializer())
 
-    # TODO: Try with the `word_emb` to have all embeddings (size: max_length, 1024)
     elmo_embeddings = ElmoEmbedding(elmo_model)
-    # elmo_embeddings = lambda x: elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-    #     "default"]
-
-    # def elmo_embeddings(x):
-    #     return elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)["default"]
 
     dense_layer_1 = keras.layers.Dense(500, activation='relu')
     dense_layer_2 = keras.layers.Dense(100, activation='relu')
-    dense_layer_3 = keras.layers.Dense(3, activation='sigmoid')
+    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
 
-    sentence_1 = keras.layers.Input(shape=(1,), dtype=tf.string)  # Sentences comes in as a string
-    sentence_2 = keras.layers.Input(shape=(1,), dtype=tf.string)
+    sentence_1 = keras.layers.Input(shape=(1,), dtype="string")  # Sentences comes in as a string
+    sentence_2 = keras.layers.Input(shape=(1,), dtype="string")
     embedding = keras.layers.Lambda(elmo_embeddings, output_shape=(1024,))
     sentence_1_embedded = embedding(sentence_1)
     sentence_2_embedded = embedding(sentence_2)
@@ -108,8 +90,8 @@ def model(sess, config):
     output = dense_layer_3(output)
 
     # Model
-    model = keras.models.Model(inputs=[sentence_1, sentence_2], outputs=[output])
-    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['accuracy'])
+    model = keras.models.Model(inputs=[sentence_1, sentence_2], outputs=output)
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
     return model
 
 
@@ -146,9 +128,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=2,
+    keras_model.fit_generator(generator_training, steps_per_epoch=100,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=1,
+                              validation_steps=len(dev_set) / config.batch_size,
                               callbacks=[tensorboard, saver])

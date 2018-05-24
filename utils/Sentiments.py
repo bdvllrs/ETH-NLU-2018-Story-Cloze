@@ -1,3 +1,7 @@
+__author__ = "Benjamin Devillers (bdvllrs)"
+__credits__ = ["Benjamin Devillers (bdvllrs)"]
+__license__ = "GPL"
+
 import numpy as np
 import os
 import random

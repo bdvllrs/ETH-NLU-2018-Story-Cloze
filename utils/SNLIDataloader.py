@@ -1,3 +1,7 @@
+__author__ = "Benjamin Devillers (bdvllrs)"
+__credits__ = ["Benjamin Devillers (bdvllrs)"]
+__license__ = "GPL"
+
 import os
 import json
 import numpy as np

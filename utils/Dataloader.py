@@ -1,3 +1,7 @@
+__author__ = "Benjamin Devillers (bdvllrs)"
+__credits__ = ["Benjamin Devillers (bdvllrs)"]
+__license__ = "GPL"
+
 import csv
 import pickle
 import numpy as np
