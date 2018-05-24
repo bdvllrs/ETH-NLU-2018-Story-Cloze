@@ -10,7 +10,8 @@ def run(config):
     for file in files:
         script = __import__(file, globals(), locals(), ['*'])
         if script.Script.slug == config.model:
-            print('Loading', config.model)
+            if config.debug:
+                print('Loading', config.model)
             script = script.Script(config)
             if config.action == 'train':
                 script.train()
@@ -18,7 +19,7 @@ def run(config):
             elif config.action == 'test':
                 script.test()
                 executed = True
-    if not executed:
+    if not executed and config.debug:
         print('This model or action does not exist.')
 
 
