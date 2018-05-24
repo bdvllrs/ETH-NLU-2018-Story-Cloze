@@ -31,7 +31,7 @@ class Script(DefaultScript):
         testing_set = Dataloader(self.config, testing_data=True)
         testing_set.load_dataset('data/test.bin')
 
-        testing_set.load_vocab('./default.voc', self.config.vocab_size)
+        testing_set.load_vocab('data/default.voc', self.config.vocab_size)
         test(self.config, testing_set)
 
 

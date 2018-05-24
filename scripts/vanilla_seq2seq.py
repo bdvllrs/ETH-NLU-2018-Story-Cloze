@@ -14,11 +14,11 @@ class Script(DefaultScript):
     def train(self):
         training_set = Dataloader(self.config)
         training_set.load_dataset('./data/train.bin')
-        training_set.load_vocab('./default.voc', self.config.vocab_size)
+        training_set.load_vocab('./data/default.voc', self.config.vocab_size)
 
         testing_set = Dataloader(self.config, testing_data=True)
         testing_set.load_dataset('data/test.bin')
-        testing_set.load_vocab('./default.voc', self.config.vocab_size)
+        testing_set.load_vocab('./data/default.voc', self.config.vocab_size)
 
         main(self.config, training_set, testing_set)
 

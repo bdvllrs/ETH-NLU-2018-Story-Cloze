@@ -88,11 +88,11 @@ def main(config):
     preprocess_fn = Preprocess(sent2vec_model)
 
     train_set = SNLIDataloader('data/snli_1.0/snli_1.0_train.jsonl')
-    train_set.load_vocab('./snli_vocab.dat', config.vocab_size)
+    train_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
     train_set.set_preprocess_fn(preprocess_fn)
     train_set.set_output_fn(output_fn)
     dev_set = SNLIDataloader('data/snli_1.0/snli_1.0_dev.jsonl')
-    dev_set.load_vocab('./snli_vocab.dat', config.vocab_size)
+    dev_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
     dev_set.set_preprocess_fn(preprocess_fn)
     dev_set.set_output_fn(output_fn)
     test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
