@@ -119,7 +119,7 @@ def model(sess, config):
     sentence_2_embedded = embedding(sentence_2)
     alpha_layer = keras.layers.Lambda(alpha_fn, output_shape=(None, 1024,))
     beta_layer = keras.layers.Lambda(beta_fn, output_shape=(None, 1024,))
-    reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(100,))
+    reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(400,))
 
     alpha, beta = alpha_layer([sentence_1_embedded, sentence_2_embedded]), beta_layer(
             [sentence_1_embedded, sentence_2_embedded])
