@@ -12,7 +12,7 @@ https://towardsdatascience.com/elmo-embeddings-in-keras-with-tensorflow-hub-7eb6
 import datetime
 import os
 import keras
-from keras import backend as keras_backed
+from keras import backend as K
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
@@ -22,7 +22,6 @@ from scripts import DefaultScript
 
 
 class Script(DefaultScript):
-
     slug = 'entailment_v1'
 
     def train(self):
@@ -31,11 +30,11 @@ class Script(DefaultScript):
 
 def preprocess_fn(line):
     # label = [entailment, neutral, contradiction]
-    label = [1]
+    label = 1
     if line['gold_label'] == 'contradiction':
-        label = [0]
+        label = 0
     elif line['gold_label'] == 'neutral':
-        label = [1]
+        label = 1
     sentence1 = ' '.join(word_tokenize(line['sentence1']))
     sentence2 = ' '.join(word_tokenize(line['sentence2']))
     output = [label, sentence1, sentence2]
@@ -54,7 +53,7 @@ class ElmoEmbedding:
 
     def __call__(self, x):
         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-            "default"]
+            "elmo"]
 
 
 def model(sess, config):
@@ -72,22 +71,68 @@ def model(sess, config):
 
     elmo_embeddings = ElmoEmbedding(elmo_model)
 
-    dense_layer_1 = keras.layers.Dense(500, activation='relu')
-    dense_layer_2 = keras.layers.Dense(100, activation='relu')
-    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
+    # Attend
+    attend_layer_1 = keras.layers.Dense(700, activation='relu')
+    attend_layer_2 = keras.layers.Dense(400, activation='relu')
 
-    sentence_1 = keras.layers.Input(shape=(1,), dtype="string")  # Sentences comes in as a string
-    sentence_2 = keras.layers.Input(shape=(1,), dtype="string")
-    embedding = keras.layers.Lambda(elmo_embeddings, output_shape=(1024,))
-    sentence_1_embedded = embedding(sentence_1)
-    sentence_2_embedded = embedding(sentence_2)
+    # Compare
+    compare_layer_1 = keras.layers.Dense(700, activation="relu")
+    compare_layer_2 = keras.layers.Dense(400, activation="relu")
+
+    # Predict
+    predict_layer_1 = keras.layers.Dense(1, activation="softmax")
+
+    def alpha_fn(x):
+        # batch_size x lA x lB
+        attend_weights = K.batch_dot(K.permute_dimensions(attend_layer_2(attend_layer_1(x[0])),
+                                                          (0, 2, 1)),
+                                     attend_layer_2(attend_layer_1(x[1])), axes=(1, 2))
+        alpha = K.softmax(attend_weights, axis=1)
+        # batch_size x lB x 1024
+        alpha = K.batch_dot(K.permute_dimensions(alpha, (0, 2, 1)), x[0], axes=(2, 1))
+        return alpha
+
+    def beta_fn(x):
+        # batch_size x lA x lB
+        weights_1 = keras.layers.Dropout(0.2)(attend_layer_1(x[0]))
+        weights_1 = keras.layers.Dropout(0.2)(attend_layer_2(weights_1))
+        weights_2 = keras.layers.Dropout(0.2)(attend_layer_1(x[1]))
+        weights_2 = keras.layers.Dropout(0.2)(attend_layer_2(weights_2))
+        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
+        beta = K.softmax(attend_weights, axis=2)
+        # batch_size x lA x 1024
+        beta = K.batch_dot(beta, x[1], axes=(2, 1))
+        return beta
+
+    def reduce_sum_fn(x):
+        return K.sum(x, axis=1)
 
     # Graph
-    inputs = keras.layers.Concatenate()([sentence_1_embedded, sentence_2_embedded])
-    # inputs = sentiments
-    output = keras.layers.Dropout(0.3)(dense_layer_1(inputs))
-    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
-    output = dense_layer_3(output)
+    sentence_1 = keras.layers.Input(shape=(1,), dtype="string")  # Sentences comes in as a string
+    sentence_2 = keras.layers.Input(shape=(1,), dtype="string")
+    embedding = keras.layers.Lambda(elmo_embeddings, output_shape=(None, 1024,))
+    # batch_size x lA x 1024
+    sentence_1_embedded = embedding(sentence_1)
+    # batch_size x lB x 1024
+    sentence_2_embedded = embedding(sentence_2)
+    alpha_layer = keras.layers.Lambda(alpha_fn, output_shape=(None, 1024,))
+    beta_layer = keras.layers.Lambda(beta_fn, output_shape=(None, 1024,))
+    reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(100,))
+
+    alpha, beta = alpha_layer([sentence_1_embedded, sentence_2_embedded]), beta_layer(
+            [sentence_1_embedded, sentence_2_embedded])
+
+    in_v1 = keras.layers.concatenate([sentence_1_embedded, beta])
+    in_v1 = keras.layers.Dropout(0.2)(compare_layer_1(in_v1))
+    in_v1 = keras.layers.Dropout(0.2)(compare_layer_2(in_v1))
+    in_v2 = keras.layers.concatenate([sentence_2_embedded, alpha])
+    in_v2 = keras.layers.Dropout(0.2)(compare_layer_1(in_v2))
+    in_v2 = keras.layers.Dropout(0.2)(compare_layer_2(in_v2))
+    v1 = reduce_sum_layer(in_v1)
+    v2 = reduce_sum_layer(in_v2)
+
+    v12 = keras.layers.concatenate([v1, v2])
+    output = predict_layer_1(v12)
 
     # Model
     model = keras.models.Model(inputs=[sentence_1, sentence_2], outputs=output)
@@ -109,7 +154,7 @@ def main(config):
 
     # Initialize tensorflow session
     sess = tf.Session()
-    keras_backed.set_session(sess)  # Set to keras backend
+    K.set_session(sess)  # Set to keras backend
 
     keras_model = model(sess, config)
 
@@ -122,13 +167,13 @@ def main(config):
                                               write_grads=True)
 
     model_path = os.path.abspath(
-        os.path.join(os.curdir, './builds/' + timestamp))
+            os.path.join(os.curdir, './builds/' + timestamp))
     model_path += '-entailmentv1_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=100,
+    keras_model.fit_generator(generator_training, steps_per_epoch=25,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
