@@ -122,3 +122,6 @@ _Mostafazadeh, Nasrin  and  Chambers, Nathanael  and  He, Xiaodong  and  Parikh,
     _Matteo Pagliardini, Prakhar Gupta, Martin Jaggi,_
 - [A large annotated corpus for learning natural language inference](https://nlp.stanford.edu/pubs/snli_paper.pdf),<br>
     _Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning_,
+- [AllenNLP for Elmo Embeddings: Deep contextualized word representations](https://arxiv.org/abs/1802.05365),
+    _Matthew E. Peters, Mark Neumann, Mohit Iyyer, Matt Gardner, Christopher Clark, Kenton Lee, Luke Zettlemoyer_.
+- [Jacob Zweig for Elmo embedding import code from Medium](https://towardsdatascience.com/elmo-embeddings-in-keras-with-tensorflow-hub-7eb6f0145440).
