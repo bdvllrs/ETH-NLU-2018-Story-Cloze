@@ -83,21 +83,23 @@ def model(sess, config):
     predict_layer_1 = keras.layers.Dense(1, activation="softmax")
 
     def alpha_fn(x):
+        weights_1 = keras.layers.Dropout(0.2)(attend_layer_1(x[0]))
+        weights_1 = keras.layers.Dropout(0.2)(attend_layer_2(weights_1))
+        weights_2 = keras.layers.Dropout(0.2)(attend_layer_1(x[1]))
+        weights_2 = keras.layers.Dropout(0.2)(attend_layer_2(weights_2))
         # batch_size x lA x lB
-        attend_weights = K.batch_dot(K.permute_dimensions(attend_layer_2(attend_layer_1(x[0])),
-                                                          (0, 2, 1)),
-                                     attend_layer_2(attend_layer_1(x[1])), axes=(1, 2))
+        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
         alpha = K.softmax(attend_weights, axis=1)
         # batch_size x lB x 1024
         alpha = K.batch_dot(K.permute_dimensions(alpha, (0, 2, 1)), x[0], axes=(2, 1))
         return alpha
 
     def beta_fn(x):
-        # batch_size x lA x lB
         weights_1 = keras.layers.Dropout(0.2)(attend_layer_1(x[0]))
         weights_1 = keras.layers.Dropout(0.2)(attend_layer_2(weights_1))
         weights_2 = keras.layers.Dropout(0.2)(attend_layer_1(x[1]))
         weights_2 = keras.layers.Dropout(0.2)(attend_layer_2(weights_2))
+        # batch_size x lA x lB
         attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
         beta = K.softmax(attend_weights, axis=2)
         # batch_size x lA x 1024
