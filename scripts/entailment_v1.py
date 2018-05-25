@@ -55,6 +55,42 @@ class ElmoEmbedding:
         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
             "elmo"]
 
+class AlphaFN:
+    def __init__(self, attend_layer_1, attend_layer_2):
+        self.attend_layer_2 = attend_layer_2
+        self.attend_layer_1 = attend_layer_1
+        self.__name__ = 'alpha_fn'
+
+    def __call__(self, x):
+        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[0]))
+        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1))
+        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[1]))
+        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2))
+        # batch_size x lA x lB
+        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
+        alpha = K.softmax(attend_weights, axis=1)
+        # batch_size x lB x 1024
+        alpha = K.batch_dot(K.permute_dimensions(alpha, (0, 2, 1)), x[0], axes=(2, 1))
+        return alpha
+
+class BetaFN:
+    def __init__(self, attend_layer_1, attend_layer_2):
+        self.attend_layer_2 = attend_layer_2
+        self.attend_layer_1 = attend_layer_1
+        self.__name__ = 'beta_fn'
+
+    def __call__(self, x):
+        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[0]))
+        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1))
+        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[1]))
+        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2))
+        # batch_size x lA x lB
+        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
+        beta = K.softmax(attend_weights, axis=2)
+        # batch_size x lA x 1024
+        beta = K.batch_dot(beta, x[1], axes=(2, 1))
+        return beta
+
 
 def model(sess, config):
     if config.debug:
@@ -82,29 +118,8 @@ def model(sess, config):
     # Predict
     predict_layer_1 = keras.layers.Dense(1, activation="softmax")
 
-    def alpha_fn(x):
-        weights_1 = keras.layers.Dropout(0.2)(attend_layer_1(x[0]))
-        weights_1 = keras.layers.Dropout(0.2)(attend_layer_2(weights_1))
-        weights_2 = keras.layers.Dropout(0.2)(attend_layer_1(x[1]))
-        weights_2 = keras.layers.Dropout(0.2)(attend_layer_2(weights_2))
-        # batch_size x lA x lB
-        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
-        alpha = K.softmax(attend_weights, axis=1)
-        # batch_size x lB x 1024
-        alpha = K.batch_dot(K.permute_dimensions(alpha, (0, 2, 1)), x[0], axes=(2, 1))
-        return alpha
-
-    def beta_fn(x):
-        weights_1 = keras.layers.Dropout(0.2)(attend_layer_1(x[0]))
-        weights_1 = keras.layers.Dropout(0.2)(attend_layer_2(weights_1))
-        weights_2 = keras.layers.Dropout(0.2)(attend_layer_1(x[1]))
-        weights_2 = keras.layers.Dropout(0.2)(attend_layer_2(weights_2))
-        # batch_size x lA x lB
-        attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
-        beta = K.softmax(attend_weights, axis=2)
-        # batch_size x lA x 1024
-        beta = K.batch_dot(beta, x[1], axes=(2, 1))
-        return beta
+    alpha_fn = AlphaFN(attend_layer_1, attend_layer_2)
+    beta_fn = BetaFN(attend_layer_1, attend_layer_2)
 
     def reduce_sum_fn(x):
         return K.sum(x, axis=1)
