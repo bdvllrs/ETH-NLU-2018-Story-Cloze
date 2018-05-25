@@ -113,12 +113,15 @@ Here is the default template for the configuration:
 ```
 
 ## Credits
-- Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>
-- Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>
-- Esteban Lanter <[elSomewhere](https://github.com/elSomewhere)>
+- Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.
+- Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>.
+- Esteban Lanter <[elSomewhere](https://github.com/elSomewhere)>.
 - [A Corpus and Cloze Evaluation for Deeper Understanding of Commonsense Stories](https://arxiv.org/abs/1604.01696), 2016 <br>
-_Mostafazadeh, Nasrin  and  Chambers, Nathanael  and  He, Xiaodong  and  Parikh, Devi  and  Batra, Dhruv  and  Vanderwende, Lucy  and  Kohli, Pushmeet  and  Allen, James_ 
+_Mostafazadeh, Nasrin  and  Chambers, Nathanael  and  He, Xiaodong  and  Parikh, Devi  and  Batra, Dhruv  and  Vanderwende, Lucy  and  Kohli, Pushmeet  and  Allen, James_.
 - [Unsupervised Learning of Sentence Embeddings using Compositional n-Gram Features NAACL](https://arxiv.org/abs/1703.02507),  2018<br>
-    _Matteo Pagliardini, Prakhar Gupta, Martin Jaggi,_
-- [A large annotated corpus for learning natural language inference](https://nlp.stanford.edu/pubs/snli_paper.pdf),<br>
-    _Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning_,
+    _Matteo Pagliardini, Prakhar Gupta, Martin Jaggi_.
+- [A large annotated corpus for learning natural language inference](https://nlp.stanford.edu/pubs/snli_paper.pdf), 2015<br>
+    _Samuel R. Bowman, Gabor Angeli, Christopher Potts, and Christopher D. Manning_.
+- [AllenNLP for Elmo Embeddings: Deep contextualized word representations](https://arxiv.org/abs/1802.05365), 2018<br>
+    _Matthew E. Peters, Mark Neumann, Mohit Iyyer, Matt Gardner, Christopher Clark, Kenton Lee, Luke Zettlemoyer_.
+- [Jacob Zweig for Elmo embedding import code from Medium](https://towardsdatascience.com/elmo-embeddings-in-keras-with-tensorflow-hub-7eb6f0145440).
