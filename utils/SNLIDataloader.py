@@ -17,8 +17,10 @@ class SNLIDataloader:
         :param file: relavite path to a jsonl file
         """
         self.file = os.path.abspath(os.path.join(os.curdir, file))
-        self.line_positions = []
-        self.original_line_positions = []
+        self.line_positions_pos = []
+        self.line_positions_neg = []
+        self.original_line_positions_pos = []
+        self.original_line_positions_neg = []
         self.output_fn = lambda w, x: x
         self.preprocess_fn = lambda x: x
         self.index_to_word = []
@@ -28,7 +30,7 @@ class SNLIDataloader:
         self.shuffle_lines()
 
     def __len__(self):
-        return len(self.line_positions)
+        return len(self.line_positions_neg) + len(self.line_positions_pos)
 
     def set_output_fn(self, output_fn):
         """
@@ -60,12 +62,14 @@ class SNLIDataloader:
         vocab = {}
         special_tokens = ['<unk>', '<pad>']
         with open(self.file, 'r') as file:
-            self.line_positions.append(file.tell())
             line = file.readline()
             while line:
-                self.line_positions.append(file.tell())
+                json_line = json.loads(line)
+                if json_line['gold_label'] == "entailment":
+                    self.line_positions_pos.append(file.tell())
+                else:
+                    self.line_positions_neg.append(file.tell())
                 if compute_vocab:
-                    json_line = json.loads(line)
                     sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
                     sentences = word_tokenize(sentences)
                     for word in sentences:
@@ -83,15 +87,18 @@ class SNLIDataloader:
             file_path = os.path.abspath(os.path.join(os.path.curdir, 'snli_vocab.dat'))
             with open(file_path, 'wb') as file:
                 pickle.dump(self.index_to_word, file)
-        self.line_positions = self.line_positions[:-1]
-        self.original_line_positions = self.line_positions[:]
+        self.line_positions_pos = self.line_positions_pos[:-1]
+        self.line_positions_neg = self.line_positions_neg[:-1]
+        self.original_line_positions_pos = self.line_positions_pos[:]
+        self.original_line_positions_neg = self.line_positions_neg[:]
 
     def shuffle_lines(self):
         """
         Shuffles the lines
         :return:
         """
-        np.random.shuffle(self.line_positions)
+        np.random.shuffle(self.line_positions_pos)
+        np.random.shuffle(self.line_positions_neg)
 
     def get(self, item, count=1, random=False, only_contradiction=False):
         """
@@ -106,8 +113,12 @@ class SNLIDataloader:
         with open(self.file, 'r') as file:
             k, j = 0, 0
             while k < count:
-                index = (item + j) % len(self)
-                position = self.line_positions[index] if random else self.original_line_positions[index]
+                if np.random.random() > 0.5:
+                    index = (item + j) % len(self.line_positions_pos)
+                    position = self.line_positions_pos[index] if random else self.original_line_positions_pos[index]
+                else:
+                    index = (item + j) % len(self.line_positions_neg)
+                    position = self.line_positions_neg[index] if random else self.original_line_positions_neg[index]
                 file.seek(position)
                 line = json.loads(file.readline())
                 if not only_contradiction or line['gold_label'] == 'contradiction':
