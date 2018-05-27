@@ -6,7 +6,6 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import os
 
-import sent2vec
 from scripts import DefaultScript
 
 
