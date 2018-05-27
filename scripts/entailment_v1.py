@@ -55,6 +55,23 @@ class ElmoEmbedding:
         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
             "elmo"]
 
+
+class IntraAttn:
+    def __init__(self, attn_layer_1, attn_layer_2):
+        self.attn_layer_2 = attn_layer_2
+        self.attn_layer_1 = attn_layer_1
+        self.__name__ = 'intra_attn'
+
+    def __call__(self, x):
+        weights = keras.layers.Dropout(0.2)(self.attn_layer_1(x))
+        weights = keras.layers.Dropout(0.2)(self.attn_layer_2(weights))
+        attn_weights = K.batch_dot(K.permute_dimensions(weights, (0, 2, 1)), weights, axes=(1, 2))
+        attn = K.softmax(attn_weights, axis=1)
+        # batch_size x lB x 1024
+        attn = K.batch_dot(K.permute_dimensions(attn, (0, 2, 1)), x, axes=(2, 1))
+        return attn
+
+
 class AlphaFN:
     def __init__(self, attend_layer_1, attend_layer_2):
         self.attend_layer_2 = attend_layer_2
@@ -72,6 +89,7 @@ class AlphaFN:
         # batch_size x lB x 1024
         alpha = K.batch_dot(K.permute_dimensions(alpha, (0, 2, 1)), x[0], axes=(2, 1))
         return alpha
+
 
 class BetaFN:
     def __init__(self, attend_layer_1, attend_layer_2):
@@ -107,6 +125,10 @@ def model(sess, config):
 
     elmo_embeddings = ElmoEmbedding(elmo_model)
 
+    # Attention
+    attn_layer_1 = keras.layers.Dense(700, activation='relu')
+    attn_layer_2 = keras.layers.Dense(400, activation='relu')
+
     # Attend
     attend_layer_1 = keras.layers.Dense(700, activation='relu')
     attend_layer_2 = keras.layers.Dense(400, activation='relu')
@@ -118,6 +140,7 @@ def model(sess, config):
     # Predict
     predict_layer_1 = keras.layers.Dense(1, activation="softmax")
 
+    attn_fn = IntraAttn(attn_layer_1, attn_layer_2)
     alpha_fn = AlphaFN(attend_layer_1, attend_layer_2)
     beta_fn = BetaFN(attend_layer_1, attend_layer_2)
 
@@ -132,17 +155,21 @@ def model(sess, config):
     sentence_1_embedded = embedding(sentence_1)
     # batch_size x lB x 1024
     sentence_2_embedded = embedding(sentence_2)
-    alpha_layer = keras.layers.Lambda(alpha_fn, output_shape=(None, 1024,))
-    beta_layer = keras.layers.Lambda(beta_fn, output_shape=(None, 1024,))
+    attn_layer = keras.layers.Lambda(attn_fn, output_shape=(None, 1024,))
+    alpha_layer = keras.layers.Lambda(alpha_fn, output_shape=(None, 2048,))
+    beta_layer = keras.layers.Lambda(beta_fn, output_shape=(None, 2048,))
     reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(400,))
 
-    alpha, beta = alpha_layer([sentence_1_embedded, sentence_2_embedded]), beta_layer(
-            [sentence_1_embedded, sentence_2_embedded])
+    sentence_1_attn = keras.layers.concatenate([sentence_1_embedded, attn_layer(sentence_1_embedded)])
+    sentence_2_attn = keras.layers.concatenate([sentence_2_embedded, attn_layer(sentence_2_embedded)])
 
-    in_v1 = keras.layers.concatenate([sentence_1_embedded, beta])
+    alpha, beta = alpha_layer([sentence_1_attn, sentence_2_attn]), beta_layer(
+            [sentence_1_attn, sentence_2_attn])
+
+    in_v1 = keras.layers.concatenate([sentence_1_attn, beta])
     in_v1 = keras.layers.Dropout(0.2)(compare_layer_1(in_v1))
     in_v1 = keras.layers.Dropout(0.2)(compare_layer_2(in_v1))
-    in_v2 = keras.layers.concatenate([sentence_2_embedded, alpha])
+    in_v2 = keras.layers.concatenate([sentence_2_attn, alpha])
     in_v2 = keras.layers.Dropout(0.2)(compare_layer_1(in_v2))
     in_v2 = keras.layers.Dropout(0.2)(compare_layer_2(in_v2))
     v1 = reduce_sum_layer(in_v1)
@@ -190,9 +217,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_acc', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=5,
+    keras_model.fit_generator(generator_training, steps_per_epoch=300,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=5,
+                              validation_steps=len(dev_set) / config.batch_size,
                               callbacks=[tensorboard, saver])
