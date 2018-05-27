@@ -126,16 +126,16 @@ def model(sess, config):
     elmo_embeddings = ElmoEmbedding(elmo_model)
 
     # Attention
-    attn_layer_1 = keras.layers.Dense(700, activation='relu')
-    attn_layer_2 = keras.layers.Dense(400, activation='relu')
+    attn_layer_1 = keras.layers.Dense(500, activation='relu')
+    attn_layer_2 = keras.layers.Dense(500, activation='relu')
 
     # Attend
-    attend_layer_1 = keras.layers.Dense(700, activation='relu')
-    attend_layer_2 = keras.layers.Dense(400, activation='relu')
+    attend_layer_1 = keras.layers.Dense(500, activation='relu')
+    attend_layer_2 = keras.layers.Dense(500, activation='relu')
 
     # Compare
-    compare_layer_1 = keras.layers.Dense(700, activation="relu")
-    compare_layer_2 = keras.layers.Dense(400, activation="relu")
+    compare_layer_1 = keras.layers.Dense(500, activation="relu")
+    compare_layer_2 = keras.layers.Dense(500, activation="relu")
 
     # Predict
     predict_layer_1 = keras.layers.Dense(1, activation="softmax")
@@ -158,7 +158,7 @@ def model(sess, config):
     attn_layer = keras.layers.Lambda(attn_fn, output_shape=(None, 1024,))
     alpha_layer = keras.layers.Lambda(alpha_fn, output_shape=(None, 2048,))
     beta_layer = keras.layers.Lambda(beta_fn, output_shape=(None, 2048,))
-    reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(400,))
+    reduce_sum_layer = keras.layers.Lambda(reduce_sum_fn, output_shape=(500,))
 
     sentence_1_attn = keras.layers.concatenate([sentence_1_embedded, attn_layer(sentence_1_embedded)])
     sentence_2_attn = keras.layers.concatenate([sentence_2_embedded, attn_layer(sentence_2_embedded)])
