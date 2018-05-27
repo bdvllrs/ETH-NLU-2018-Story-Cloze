@@ -3,7 +3,6 @@ import random
 import datetime
 import keras
 import numpy as np
-import sent2vec
 from utils import Dataloader
 from scripts import DefaultScript
 
@@ -106,6 +105,7 @@ def keras_model(config):
 
 
 def main(config, training_set, testing_set):
+    import sent2vec
     assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
     sent2vec_model = sent2vec.Sent2vecModel()
     sent2vec_model.load_model(config.sent2vec.model)

@@ -11,7 +11,6 @@ import datetime
 import os
 import keras
 from keras.utils.np_utils import to_categorical
-import sent2vec
 import numpy as np
 from utils import SNLIDataloader
 from nltk import word_tokenize
@@ -81,6 +80,7 @@ def model(config):
 
 
 def main(config):
+    import sent2vec
     assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
     sent2vec_model = sent2vec.Sent2vecModel()
     sent2vec_model.load_model(config.sent2vec.model)

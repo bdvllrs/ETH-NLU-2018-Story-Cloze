@@ -65,19 +65,19 @@ class SNLIDataloader:
             line = file.readline()
             while line:
                 json_line = json.loads(line)
-                if json_line['gold_label'] == "entailment":
-                    self.line_positions_pos.append(file.tell())
-                else:
-                    self.line_positions_neg.append(file.tell())
-                if compute_vocab:
-                    sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
-                    sentences = word_tokenize(sentences)
-                    for word in sentences:
-                        word = word.lower()
-                        if word in vocab.keys():
-                            vocab[word] += 1
-                        else:
-                            vocab[word] = 1
+                if json_line['gold_label'] != '-':
+                    if json_line['gold_label'] == "entailment":
+                        self.line_positions_pos.append(file.tell())
+                        self.line_positions_neg.append(file.tell())
+                    if compute_vocab:
+                        sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
+                        sentences = word_tokenize(sentences)
+                        for word in sentences:
+                            word = word.lower()
+                            if word in vocab.keys():
+                                vocab[word] += 1
+                            else:
+                                vocab[word] = 1
                 line = file.readline()
         if compute_vocab:
             self.index_to_word = list(list(zip(*sorted(vocab.items(), key=lambda w: w[1], reverse=True)))[0])
