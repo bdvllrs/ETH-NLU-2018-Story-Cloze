@@ -152,9 +152,9 @@ def model(sess, config):
     output = predict_layer_1(v12)
 
     # Model
-    model = keras.models.Model(inputs=[sentence_1, sentence_2], outputs=output)
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
-    return model
+    entailment_model = keras.models.Model(inputs=[sentence_1, sentence_2], outputs=output)
+    entailment_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+    return entailment_model
 
 
 def main(config):
@@ -164,7 +164,7 @@ def main(config):
     dev_set = SNLIDataloader('data/snli_1.0/snli_1.0_dev.jsonl')
     dev_set.set_preprocess_fn(preprocess_fn)
     dev_set.set_output_fn(output_fn)
-    test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
+    # test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
 
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
     generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs)
