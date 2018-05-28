@@ -22,8 +22,7 @@ here is an example of a preprocess function. The goal is to set all sentences in
 
 ```python
 def preprocess_fn(word_to_index, sentence):
-    words = sentence.split(' ')
-    return list(map(lambda x: word_to_index[x] if x in word_to_index.keys() else word_to_index['<unk>'], words))
+    return list(map(lambda x: word_to_index[x] if x in word_to_index.keys() else word_to_index['<unk>'], sentence))
 ```
 
 #### Changing the output of get
