@@ -40,7 +40,6 @@ def output_fn_train(data):
     batch = np.array(data.batch)
     last_sentences = batch[:, 3, :]
     endings = batch[:, 4, :]
-    sentiments = np.array(data.sentiments)
     label = []
     # Randomly choose a bad ending
     for i in range(len(batch)):
@@ -51,11 +50,10 @@ def output_fn_train(data):
             new_batch = np.array(new_data.batch)
             endings[i] = new_batch[0, 4, :]
             label.append(0)
-            sentiments[i] = np.array(new_data.sentiments)[0, :]
         else:
             label.append(1)
     # Return what's needed for keras
-    return [last_sentences, endings, sentiments], np.array(label)
+    return [last_sentences, endings], np.array(label)
 
 
 def output_fn_test(data):
@@ -63,26 +61,21 @@ def output_fn_test(data):
     last_sentences = batch[:, 3, :]
     ending_1 = batch[:, 4, :]
     ending_2 = batch[:, 5, :]
-    sentiments = np.array(data.sentiments)[:, :6]
     correct_ending = data.label
     endings = ending_2[:]
-    sentiment_1 = sentiments[:, :5]
-    sentiment_2 = np.concatenate((sentiments[:, :4], sentiments[:, 5:6]), axis=1)
-    sentiments = sentiment_2
     # correct ending if 1 --> if 2 true get 2 - 1 = 1, if 1 true get 1 - 1 = 0
     label = np.array(correct_ending) - 1
     if random.random() > 0.5:
         endings = ending_1[:]
         label = 1 - label
-        sentiments = sentiment_1
     # Return what's needed for keras
-    return [last_sentences, endings, sentiments], label
+    return [last_sentences, endings], label
 
 
 def keras_model(config):
     # Layers
     dense_layer_1 = keras.layers.Dense(500, activation='relu')
-    dense_layer_2 = keras.layers.Dense(100, activation='relu')
+    dense_layer_2 = keras.layers.Dense(50, activation='relu')
     dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
 
     # Inputs

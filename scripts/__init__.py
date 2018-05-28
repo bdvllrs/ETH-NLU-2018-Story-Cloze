@@ -19,6 +19,9 @@ def run(config):
             elif config.action == 'test':
                 script.test()
                 executed = True
+            elif config.action == 'eval':
+                script.eval()
+                executed = True
     if not executed and config.debug:
         print('This model or action does not exist.')
 
@@ -34,4 +37,7 @@ class DefaultScript:
         pass
 
     def test(self):
+        pass
+
+    def eval(self):
         pass

@@ -11,12 +11,14 @@ https://towardsdatascience.com/elmo-embeddings-in-keras-with-tensorflow-hub-7eb6
 """
 import datetime
 import os
+import random
+
 import keras
 from keras import backend as K
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
-from utils import SNLIDataloader
+from utils import SNLIDataloader, Dataloader
 from nltk import word_tokenize
 from scripts import DefaultScript
 
@@ -33,8 +35,6 @@ def preprocess_fn(line):
     label = 1
     if line['gold_label'] == 'contradiction':
         label = 0
-    elif line['gold_label'] == 'neutral':
-        label = 1
     sentence1 = ' '.join(word_tokenize(line['sentence1']))
     sentence2 = ' '.join(word_tokenize(line['sentence2']))
     output = [label, sentence1, sentence2]
@@ -44,6 +44,26 @@ def preprocess_fn(line):
 def output_fn(_, batch):
     batch = np.array(batch, dtype=object)
     return [batch[:, 1], batch[:, 2]], np.array(list(batch[:, 0]))
+
+
+def output_fn_test(data):
+    batch = np.array(data.batch)
+    sentences1 = []
+    sentences2 = []
+    label = []
+    for b in batch:
+        sentence = " ".join(b[0]) + " "
+        sentence += " ".join(b[1]) + " "
+        sentence += " ".join(b[2]) + " "
+        sentence += " ".join(b[3]) + " "
+        if random.random() > 0.5:
+            sentences2.append(" ".join(b[4]))
+            label.append(2 - int(b[6][0]))
+        else:
+            sentences2.append(" ".join(b[5]))
+            label.append(int(b[6][0]) - 1)
+        sentences1.append(sentence)
+    return [np.array(sentences1), np.array(sentences2)], np.array(label)
 
 
 class ElmoEmbedding:
@@ -78,7 +98,9 @@ def model(sess, config):
     sentence2_emb = elmo_embeddings(sentence2)
 
     sentences = keras.layers.concatenate([sentence1_emb, sentence2_emb])
-    output = keras.layers.Dense(600, activation='relu')(sentences)
+    output = keras.layers.Dense(1000, activation='relu')(sentences)
+    output = keras.layers.Dropout(0.2)(output)
+    output = keras.layers.Dense(50, activation='relu')(output)
     output = keras.layers.Dropout(0.2)(output)
     output = keras.layers.Dense(1, activation='sigmoid')(output)
 
@@ -93,13 +115,16 @@ def main(config):
     train_set = SNLIDataloader('data/snli_1.0/snli_1.0_train.jsonl')
     train_set.set_preprocess_fn(preprocess_fn)
     train_set.set_output_fn(output_fn)
-    dev_set = SNLIDataloader('data/snli_1.0/snli_1.0_dev.jsonl')
-    dev_set.set_preprocess_fn(preprocess_fn)
-    dev_set.set_output_fn(output_fn)
-    # test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
+
+    test_set = Dataloader(config, 'data/test_stories.csv', testing_data=True)
+    # test_set.set_preprocess_fn(preprocess_fn)
+    test_set.load_dataset('data/test.bin')
+    test_set.load_vocab('./data/default.voc', config.vocab_size)
+    test_set.set_output_fn(output_fn_test)
 
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
-    generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs)
+    generator_test = test_set.get_batch(config.batch_size, config.n_epochs)
+
 
     # Initialize tensorflow session
     sess = tf.Session()
@@ -125,6 +150,6 @@ def main(config):
     keras_model.fit_generator(generator_training, steps_per_epoch=300,
                               epochs=config.n_epochs,
                               verbose=verbose,
-                              validation_data=generator_dev,
-                              validation_steps=len(dev_set) / config.batch_size,
+                              validation_data=generator_test,
+                              validation_steps=5,
                               callbacks=[tensorboard, saver])
