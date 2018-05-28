@@ -7,6 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", help="Model to use")
 parser.add_argument("-a", "--action", help="Action to use")
 parser.add_argument("--nthreads", '-t', type=int, default=2, help="Number of threads to use")
+parser.add_argument("--embedding_type", '-e', help="Type of embedding to use")
 args = parser.parse_args()
 
 config = Config('./config', args=args)
