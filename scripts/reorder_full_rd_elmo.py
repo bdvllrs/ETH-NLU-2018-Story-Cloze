@@ -126,7 +126,7 @@ class Script(DefaultScript):
 
     def build_graph(self, sess):
         if self.config.debug:
-            print('Importing Elmo module...')
+            print('Importing Elmo/USE module...')
         if self.config.hub.is_set("cache_dir"):
             os.environ['TFHUB_CACHE_DIR'] = self.config.hub.cache_dir
 

@@ -67,29 +67,45 @@ def output_fn_test(data):
 
 
 class ElmoEmbedding:
-    def __init__(self, elmo_model):
+    def __init__(self, elmo_model, embedding_type):
         self.elmo_model = elmo_model
+        self.embedding_type = embedding_type
         self.__name__ = "elmo_embeddings"
 
     def __call__(self, x):
-        return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-            "default"]
+        if self.embedding_type['name'] == "elmo":
+            return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
+                "default"]
+        if self.embedding_type['name'] == "use":
+            return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)))
 
 
 def model(sess, config):
     if config.debug:
-        print('Importing Elmo module...')
+        print('Importing Elmo/USE module...')
     if config.hub.is_set("cache_dir"):
         os.environ['TFHUB_CACHE_DIR'] = config.hub.cache_dir
 
-    elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+    embedding_types = {
+        "elmo": {
+            "name": "elmo",
+            "url": "https://tfhub.dev/google/elmo/1",
+            "size": 1024
+        },
+        "use": {
+            "name": "use",
+            "url": "https://tfhub.dev/google/universal-sentence-encoder/1",
+            "size": 512
+        }
+    }[config.embedding_type]
+    elmo_model = hub.Module(embedding_types['url'], trainable=True)
 
     if config.debug:
         print('Imported.')
     sess.run(tf.global_variables_initializer())
     sess.run(tf.tables_initializer())
 
-    elmo_embeddings = keras.layers.Lambda(ElmoEmbedding(elmo_model), output_shape=(1024,))
+    elmo_embeddings = keras.layers.Lambda(ElmoEmbedding(elmo_model, embedding_types), output_shape=(embedding_types['size'],))
 
     sentence1 = keras.layers.Input(shape=(1,), dtype='string')
     sentence2 = keras.layers.Input(shape=(1,), dtype='string')
