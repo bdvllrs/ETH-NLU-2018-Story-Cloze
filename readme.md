@@ -12,9 +12,19 @@ To simply get a `Data` object, use `Dataloader.get(index, amount)`.
 #### Pre-processing
 One can control pre-processing by setting the `preprocess_fn` attribute or by calling
 `Dataloader.set_preprocess_fn(callback)`.
+
+The preprocess function must take two arguments: 
+- `word_to_index` which is a dict mapping words to index.
+- `sentence` one sentence
 #### Changing the output of get
 The output of the get method is controlled by the `output_fn` attribute, or by calling
 `Dataloader.set_output_fn(callback)`.
+
+The `output_fn` callback must take one argument:
+- data a `utils.Data` object 
+To get the batch out of the `Data` object, use `Data.batch`. The label can be accessed by `Data.label`
+and the `Dataloader` instance by `Data.dataloader`.
+
 ### Vocabs
 To compute the vocab of the Dataset, use `Dataloader.compute_vocab()`.
 Save it with `Dataloader.save_vocab(file, size=-1)` that saves all vocab by default.
