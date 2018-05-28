@@ -12,6 +12,8 @@
   "model": "scheduler",
   "action": "train",
 
+  "embedding_type": "elmo",
+
   "debug": true,
 
   "sent2vec": {
