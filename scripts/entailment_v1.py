@@ -215,7 +215,7 @@ def main(config):
     model_path += '-entailmentv1_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+                                            monitor='val_loss', verbose=verbose, save_best_only=True)
 
     keras_model.fit_generator(generator_training, steps_per_epoch=300,
                               epochs=config.n_epochs,

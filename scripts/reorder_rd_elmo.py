@@ -27,14 +27,18 @@ def output_fn(data):
     sentences2 = []
     label = []
     for b in batch:
+        sentences1.append(" ".join(b[3]))
         if random.random() > 0.5:
-            sentences1.append(" ".join(b[3]))
             sentences2.append(" ".join(b[4]))
             label.append(1)
         else:
-            sentences1.append(" ".join(b[4]))
-            sentences2.append(" ".join(b[3]))
-            label.append(0)
+            k = random.randint(0, len(data.dataloader))
+            random_story = data.dataloader.get(k, 1, raw=True).batch[0]
+            sentences2.append(" ".join(random_story[4]))
+            if random_story[4] == b[4]:
+                label.append(1)
+            else:
+                label.append(0)
     return [np.array(sentences1), np.array(sentences2)], np.array(label)
 
 
@@ -57,7 +61,7 @@ def output_fn_test(data):
 
 class Script(DefaultScript):
 
-    slug = 'reorder_elmo'
+    slug = 'reorder_rd_elmo'
 
     def train(self):
         train_set = Dataloader(self.config, 'data/train_stories.csv')
@@ -81,23 +85,23 @@ class Script(DefaultScript):
         verbose = 0 if not self.config.debug else 1
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # Callbacks
-        tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-reorder-elmo/', histogram_freq=0,
+        tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-reorder-rd-elmo/', histogram_freq=0,
                                                   batch_size=self.config.batch_size,
                                                   write_graph=False,
                                                   write_grads=True)
 
         model_path = os.path.abspath(
                 os.path.join(os.curdir, './builds/' + timestamp))
-        model_path += '-reorder-elmo_checkpoint_epoch-{epoch:02d}.hdf5'
+        model_path += '-reorder-rd-elmo_checkpoint_epoch-{epoch:02d}.hdf5'
 
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
 
-        keras_model.fit_generator(generator_training, steps_per_epoch=300,
+        keras_model.fit_generator(generator_training, steps_per_epoch=5,
                                   epochs=self.config.n_epochs,
                                   verbose=verbose,
                                   validation_data=generator_dev,
-                                  validation_steps=len(test_set) / self.config.batch_size,
+                                  validation_steps=5,
                                   callbacks=[tensorboard, saver])
 
     def eval(self):
