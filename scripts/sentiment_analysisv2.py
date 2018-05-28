@@ -66,8 +66,9 @@ def model(sess, config):
 
     model = keras.models.Sequential([
         keras.layers.Lambda(elmo_embeddings, input_shape=(1,), dtype="string", output_shape=(None, 1024)),
-        keras.layers.LSTM(500),
+        keras.layers.LSTM(500, dropout=0.2),
         keras.layers.Dense(100, activation='relu'),
+        keras.layers.Dropout(0.2),
         keras.layers.Dense(1, activation='sigmoid')
     ])
 
