@@ -16,6 +16,16 @@ One can control pre-processing by setting the `preprocess_fn` attribute or by ca
 The preprocess function must take two arguments: 
 - `word_to_index` which is a dict mapping words to index.
 - `sentence` one sentence
+
+##### Example
+here is an example of a preprocess function. The goal is to set all sentences into tokens:
+
+```python
+def preprocess_fn(word_to_index, sentence):
+    words = sentence.split(' ')
+    return list(map(lambda x: word_to_index[x] if x in word_to_index.keys() else word_to_index['<unk>'], words))
+```
+
 #### Changing the output of get
 The output of the get method is controlled by the `output_fn` attribute, or by calling
 `Dataloader.set_output_fn(callback)`.
