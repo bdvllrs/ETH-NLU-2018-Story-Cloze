@@ -147,7 +147,7 @@ class Script(DefaultScript):
         sentences = keras.layers.concatenate([sentence1_emb, sentence2_emb])
         output = keras.layers.Dense(1000, activation='relu')(sentences)
         output = keras.layers.Dropout(0.2)(output)
-        output = keras.layers.Dense(50, activation='relu')(output)
+        output = keras.layers.Dense(500, activation='relu')(output)
         output = keras.layers.Dropout(0.2)(output)
         output = keras.layers.Dense(1, activation='sigmoid')(output)
 
