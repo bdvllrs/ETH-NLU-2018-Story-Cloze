@@ -167,5 +167,5 @@ def main(config):
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_test,
-                              validation_steps=5,
+                              validation_steps=len(test_set) / config.batch_size,
                               callbacks=[tensorboard, saver])
