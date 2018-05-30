@@ -8,6 +8,8 @@ Credits to
     https://nlp.stanford.edu/pubs/snli_paper.pdf.
 """
 import datetime
+import pickle
+from tqdm import tqdm
 import os
 import keras
 import tensorflow as tf
@@ -15,12 +17,11 @@ import tensorflow_hub as hub
 import keras.backend as K
 from keras.utils import to_categorical
 import numpy as np
-from utils import SNLIDataloader
+from utils import SNLIDataloaderPairs
 from scripts import DefaultScript
 
 
 class Script(DefaultScript):
-
     slug = 'type_translation'
 
     def train(self):
@@ -34,7 +35,7 @@ class ElmoEmbedding:
 
     def __call__(self, x):
         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-            "elmo"]
+            "default"]
 
 
 def preprocess_fn(line):
@@ -42,46 +43,63 @@ def preprocess_fn(line):
     return output
 
 
-def output_fn(word_to_index, batch):
-    num_classes = len(word_to_index.keys())
-    input_sentences = []
-    output_sentences = []
-    for b in batch:
-        input_sentences.append(b[0])
-        output_sentences.append(b[1])
-    output = []
-    max_size = 0
-    for b in range(len(output_sentences)):
-        words = output_sentences[b].split(' ')
-        sentence = []
-        for word in words:
-            word = word.lower()
-            label = word_to_index[word] if word in word_to_index.keys() else word_to_index['<unk>']
-            sentence.append(label)
-        if len(sentence) > max_size:
-            max_size = len(sentence)
-        output.append(sentence)
-    for b in range(len(output_sentences)):
-        output[b] += [word_to_index['<pad>']] * (max_size - len(output[b]))
-        for k, word in enumerate(output[b]):
-            output[b][k] = to_categorical(word, num_classes=num_classes)
-    return input_sentences, np.array(output)
+class OutputFN:
+    def __init__(self, elmo_emb_model, graph):
+        self.graph = graph
+        self.elmo_emb_model = elmo_emb_model
+
+    def __call__(self, _, batch):
+        ref_sentences = []
+        input_sentences = []
+        output_sentences = []
+        for b in batch:
+            ref_sentences.append(b[0][0])
+            input_sentences.append(b[0][1])
+            output_sentences.append(b[1][1])
+        output_sentences = np.array(output_sentences, dtype=object)
+        with self.graph.as_default():
+            out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=8)
+        return [np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)], out_sent
 
 
-class ModelLoss:
-    def __init__(self, elmo_embedding):
-        self.elmo_embedding = elmo_embedding
-        self.__name__ = 'model_loss'
-
-    def __call__(self, y_true, y_pred):
-        emb_true = self.elmo_embedding(y_true)
-        emb_pred = self.elmo_embedding(y_pred)
-        y_true = K.l2_normalize(emb_true, axis=-1)
-        y_pred = K.l2_normalize(emb_pred, axis=-1)
-        return -K.sum(y_true * y_pred, axis=-1)
+def get_elmo_embedding(elmo_fn):
+    elmo_embeddings = keras.layers.Lambda(elmo_fn, output_shape=(1024,))
+    sentence = keras.layers.Input(shape=(1,), dtype="string")
+    sentence_emb = elmo_embeddings(sentence)
+    model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
+    return model
 
 
-def model(sess, config):
+def model(elmo_fn):
+    elmo_embeddings = keras.layers.Lambda(elmo_fn, output_shape=(1024,))
+
+    dense_layer_1 = keras.layers.Dense(4000, activation='relu')
+    dense_layer_2 = keras.layers.Dense(3000, activation='relu')
+    dense_layer_3 = keras.layers.Dense(1024, activation='relu')
+
+    sentence_ref = keras.layers.Input(shape=(1,), dtype="string")
+    sentence_neutral = keras.layers.Input(shape=(1,), dtype="string")
+    sentence_ref_emb = elmo_embeddings(sentence_ref)
+    sentence_neutral_emb = elmo_embeddings(sentence_neutral)
+
+    sentence = keras.layers.concatenate([sentence_ref_emb, sentence_neutral_emb])
+
+    # inputs = sentiments
+    output = keras.layers.Dropout(0.3)(dense_layer_1(sentence))
+    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
+    output = dense_layer_3(output)
+
+    # Model
+    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
+    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['accuracy'])
+    return model
+
+
+def main(config):
+    # Initialize tensorflow session
+    sess = tf.Session()
+    K.set_session(sess)  # Set to keras backend
+
     if config.debug:
         print('Importing Elmo module...')
     if config.hub.is_set("cache_dir"):
@@ -94,50 +112,28 @@ def model(sess, config):
     sess.run(tf.global_variables_initializer())
     sess.run(tf.tables_initializer())
 
+    graph = tf.get_default_graph()
+
     elmo_emb_fn = ElmoEmbedding(elmo_model)
 
-    elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(None, 1024))
+    elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
 
-    gru_layer = keras.layers.GRU(700, dropout=0.2, recurrent_dropout=0.2, return_sequences=True)
-    dense_layer_1 = keras.layers.Dense(500, activation='relu')
-    dense_layer_2 = keras.layers.Dense(500, activation='relu')
-    dense_layer_3 = keras.layers.Dense(config.vocab_size, activation='softmax')
+    output_fn = OutputFN(elmo_model_emb, graph)
 
-    sentence = keras.layers.Input(shape=(1,), dtype="string")
-    sentence_emb = elmo_embeddings(sentence)
-
-    # inputs = sentiments
-    sequences = gru_layer(sentence_emb)
-    output = keras.layers.Dropout(0.3)(dense_layer_1(sequences))
-    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
-    output = dense_layer_3(output)
-
-    # Model
-    loss = ModelLoss(elmo_emb_fn)
-    model = keras.models.Model(inputs=sentence, outputs=output)
-    model.compile(optimizer="adam", loss=loss, metrics=['accuracy'])
-    return model
-
-
-def main(config):
-    train_set = SNLIDataloader('data/snli_1.0/snli_1.0_train.jsonl')
+    train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
     train_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
     train_set.set_preprocess_fn(preprocess_fn)
     train_set.set_output_fn(output_fn)
-    dev_set = SNLIDataloader('data/snli_1.0/snli_1.0_dev.jsonl')
+    dev_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_dev.jsonl')
     dev_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
     dev_set.set_preprocess_fn(preprocess_fn)
     dev_set.set_output_fn(output_fn)
     # test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
 
-    generator_training = train_set.get_batch(config.batch_size, config.n_epochs, only_contradiction=True)
-    generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs, only_contradiction=True)
+    generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
+    generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs)
 
-    # Initialize tensorflow session
-    sess = tf.Session()
-    K.set_session(sess)  # Set to keras backend
-
-    keras_model = model(sess, config)
+    keras_model = model(elmo_emb_fn)
 
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -148,15 +144,15 @@ def main(config):
                                               write_grads=True)
 
     model_path = os.path.abspath(
-        os.path.join(os.curdir, './builds/' + timestamp))
+            os.path.join(os.curdir, './builds/' + timestamp))
     model_path += '-type-translation_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_acc', verbose=verbose, save_best_only=True)
+                                            monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=5,
+    keras_model.fit_generator(generator_training, steps_per_epoch=100,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=len(dev_set) / config.batch_size,
+                              validation_steps=len(dev_set)/config.batch_size,
                               callbacks=[tensorboard, saver])

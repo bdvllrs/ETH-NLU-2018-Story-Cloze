@@ -12,26 +12,25 @@ from nltk import word_tokenize
 class SNLIDataloaderPairs:
     """SNLI Dataloader"""
 
-    def __init__(self, file, compute_vocab=False):
+    def __init__(self, file):
         """
         :param file: relavite path to a jsonl file
         """
         self.file = os.path.abspath(os.path.join(os.curdir, file))
         self.line_positions_pos = []
         self.line_positions_neg = []
-        self.original_line_positions_pos = []
-        self.original_line_positions_neg = []
+        self.line_positions = []
         self.output_fn = lambda w, x: x
         self.preprocess_fn = lambda x: x
         self.index_to_word = []
         self.lines_id = []
         self.word_to_index = {}
 
-        self._get_line_positions(compute_vocab)
+        self._get_line_positions()
         self.shuffle_lines()
 
     def __len__(self):
-        return len(self.line_positions_neg) + len(self.line_positions_pos)
+        return len(self.line_positions)
 
     def set_output_fn(self, output_fn):
         """
@@ -55,50 +54,30 @@ class SNLIDataloaderPairs:
             self.word_to_index[word] = k
         print('Loaded.')
 
-    def _get_line_positions(self, compute_vocab=False):
+    def _get_line_positions(self):
         """
         Get seek position of all new lines
         """
-        self.file_length = 0
-        vocab = {}
-        special_tokens = ['<unk>', '<pad>']
-        position_neg = {}
-        position_pos = {}
+        positions = {}
         with open(self.file, 'r') as file:
+            line_pos = file.tell()
             line = file.readline()
             while line:
                 json_line = json.loads(line)
                 if json_line['gold_label'] != '-':
-                    pair_id = json_line['captionID'].split('.')[0]
+                    pair_id = json_line['pairID'][:-1]
+                    if pair_id not in positions.keys():
+                        positions[pair_id] = {'neg': None, 'pos': None}
                     if json_line['gold_label'] == "contradiction":
-                        position_neg[pair_id] = file.tell()
-                    if json_line['gold_label'] == "neutral":
-                        position_pos[pair_id] = file.tell()
-                    if compute_vocab:
-                        sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
-                        sentences = word_tokenize(sentences)
-                        for word in sentences:
-                            word = word.lower()
-                            if word in vocab.keys():
-                                vocab[word] += 1
-                            else:
-                                vocab[word] = 1
+                        positions[pair_id]['neg'] = line_pos
+                    elif json_line['gold_label'] == "neutral":
+                        positions[pair_id]['pos'] = line_pos
+                line_pos = file.tell()
                 line = file.readline()
-        self.line_positions_pos = list(list(zip(*sorted(position_pos.items(), key=lambda w: w[0])))[1])
-        self.line_positions_neg = list(list(zip(*sorted(position_neg.items(), key=lambda w: w[0])))[1])
-        self.lines_id = list(range(len(self.line_positions_pos)))
-        if compute_vocab:
-            self.index_to_word = list(list(zip(*sorted(vocab.items(), key=lambda w: w[1], reverse=True)))[0])
-            self.index_to_word = [token for token in special_tokens] + self.index_to_word
-            for k, word in enumerate(self.index_to_word):
-                self.word_to_index[word] = k
-            file_path = os.path.abspath(os.path.join(os.path.curdir, 'snli_vocab.dat'))
-            with open(file_path, 'wb') as file:
-                pickle.dump(self.index_to_word, file)
-        self.line_positions_pos = self.line_positions_pos[:-1]
-        self.line_positions_neg = self.line_positions_neg[:-1]
-        self.original_line_positions_pos = self.line_positions_pos[:]
-        self.original_line_positions_neg = self.line_positions_neg[:]
+        for position in positions.values():
+            if position['pos'] is not None and position['neg'] is not None:
+                self.line_positions.append(position)
+        self.lines_id = list(range(len(self.line_positions)))
 
     def shuffle_lines(self):
         """
@@ -119,9 +98,10 @@ class SNLIDataloaderPairs:
         with open(self.file, 'r') as file:
             k = 0
             while k < count:
-                index = (item + k) % len(self.line_positions_pos)
-                position_pos = self.line_positions_pos[self.lines_id[index]] if random else self.original_line_positions_pos[index]
-                position_neg = self.line_positions_neg[self.lines_id[index]] if random else self.original_line_positions_neg[index]
+                index = (item + k) % len(self.line_positions)
+                positions = self.line_positions[self.lines_id[index]] if random else self.line_positions[index]
+                position_pos = positions['pos']
+                position_neg = positions['neg']
                 file.seek(position_pos)
                 line_pos = json.loads(file.readline())
                 file.seek(position_neg)

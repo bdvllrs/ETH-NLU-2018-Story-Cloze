@@ -62,14 +62,15 @@ class SNLIDataloader:
         vocab = {}
         special_tokens = ['<unk>', '<pad>']
         with open(self.file, 'r') as file:
+            line_pos = file.tell()
             line = file.readline()
             while line:
                 json_line = json.loads(line)
                 if json_line['gold_label'] != '-':
                     if json_line['gold_label'] == "contradiction":
-                        self.line_positions_neg.append(file.tell())
+                        self.line_positions_neg.append(line_pos)
                     else:
-                        self.line_positions_pos.append(file.tell())
+                        self.line_positions_pos.append(line_pos)
                     if compute_vocab:
                         sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
                         sentences = word_tokenize(sentences)
@@ -79,6 +80,7 @@ class SNLIDataloader:
                                 vocab[word] += 1
                             else:
                                 vocab[word] = 1
+                line_pos = file.tell()
                 line = file.readline()
         if compute_vocab:
             self.index_to_word = list(list(zip(*sorted(vocab.items(), key=lambda w: w[1], reverse=True)))[0])
@@ -88,8 +90,8 @@ class SNLIDataloader:
             file_path = os.path.abspath(os.path.join(os.path.curdir, 'snli_vocab.dat'))
             with open(file_path, 'wb') as file:
                 pickle.dump(self.index_to_word, file)
-        self.line_positions_pos = self.line_positions_pos[:-1]
-        self.line_positions_neg = self.line_positions_neg[:-1]
+        self.line_positions_pos = self.line_positions_pos[:]
+        self.line_positions_neg = self.line_positions_neg[:]
         self.original_line_positions_pos = self.line_positions_pos[:]
         self.original_line_positions_neg = self.line_positions_neg[:]
 
