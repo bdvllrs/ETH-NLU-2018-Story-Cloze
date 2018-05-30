@@ -164,6 +164,7 @@ def main(config):
 
 
 def test(config, testing_set):
+    import sent2vec
     assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
     sent2vec_model = sent2vec.Sent2vecModel()
     sent2vec_model.load_model(config.sent2vec.model)

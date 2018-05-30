@@ -24,6 +24,49 @@ class Script(DefaultScript):
     def train(self):
         main(self.config)
 
+    def eval(self):
+        # Initialize tensorflow session
+        sess = tf.Session()
+        K.set_session(sess)  # Set to keras backend
+
+        if self.config.debug:
+            print('Importing Elmo module...')
+        if self.config.hub.is_set("cache_dir"):
+            os.environ['TFHUB_CACHE_DIR'] = self.config.hub.cache_dir
+
+        elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+        if self.config.debug:
+            print('Imported.')
+
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.tables_initializer())
+
+        graph = tf.get_default_graph()
+
+        elmo_emb_fn = ElmoEmbedding(elmo_model)
+
+        elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
+
+        output_fn = OutputFN(elmo_model_emb, graph)
+
+        test_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_test.jsonl')
+        test_set.set_preprocess_fn(preprocess_fn)
+        test_set.set_output_fn(output_fn)
+
+        generator_test = test_set.get_batch(self.config.batch_size, self.config.n_epochs)
+
+        # keras_model = model(elmo_emb_fn)
+
+        verbose = 0 if not self.config.debug else 1
+
+        keras_model = keras.models.load_model(
+                './builds/leonhard/2018-05-30 15:22:53-type-translation_checkpoint_epoch-77.hdf5', {
+                    'elmo_embeddings': elmo_emb_fn
+                })
+        loss = keras_model.evaluate_generator(generator_test, steps=len(test_set) / self.config.batch_size,
+                                              verbose=verbose)
+        print(loss)
+
 
 class ElmoEmbedding:
     def __init__(self, elmo_model):
