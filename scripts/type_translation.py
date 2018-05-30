@@ -115,7 +115,7 @@ def model(elmo_fn):
 
     dense_layer_1 = keras.layers.Dense(4000, activation='relu')
     dense_layer_2 = keras.layers.Dense(3000, activation='relu')
-    dense_layer_3 = keras.layers.Dense(1024, activation='relu')
+    dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
 
     sentence_ref = keras.layers.Input(shape=(1,), dtype="string")
     sentence_neutral = keras.layers.Input(shape=(1,), dtype="string")
