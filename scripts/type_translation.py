@@ -88,7 +88,7 @@ def model(elmo_fn):
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer="adam", loss="mean_squared_error", metrics=['accuracy'])
     return model
 
 
