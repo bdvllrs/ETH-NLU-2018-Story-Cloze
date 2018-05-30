@@ -8,14 +8,11 @@ Credits to
     https://nlp.stanford.edu/pubs/snli_paper.pdf.
 """
 import datetime
-import pickle
-from tqdm import tqdm
 import os
 import keras
 import tensorflow as tf
 import tensorflow_hub as hub
 import keras.backend as K
-from keras.utils import to_categorical
 import numpy as np
 from utils import SNLIDataloaderPairs
 from scripts import DefaultScript
