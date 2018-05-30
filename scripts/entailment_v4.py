@@ -160,7 +160,7 @@ def main(config):
     elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
 
     type_translation_model = keras.models.load_model(
-            './builds/leonhard/2018-05-30 15:22:53-type-translation_checkpoint_epoch-77.hdf5', {
+            config.type_translation_model, {
                 'elmo_embeddings': elmo_emb_fn
             })
 
@@ -181,28 +181,28 @@ def main(config):
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
     generator_test = test_set.get_batch(config.batch_size, config.n_epochs)
 
-    print(next(generator_training))
+    # print(next(generator_training))
 
-    # keras_model = model()
-    #
-    # verbose = 0 if not config.debug else 1
-    # timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # # Callbacks
-    # tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv4/', histogram_freq=0,
-    #                                           batch_size=config.batch_size,
-    #                                           write_graph=False,
-    #                                           write_grads=True)
-    #
-    # model_path = os.path.abspath(
-    #         os.path.join(os.curdir, './builds/' + timestamp))
-    # model_path += '-entailmentv4_checkpoint_epoch-{epoch:02d}.hdf5'
-    #
-    # saver = keras.callbacks.ModelCheckpoint(model_path,
-    #                                         monitor='val_loss', verbose=verbose, save_best_only=True)
-    #
-    # keras_model.fit_generator(generator_training, steps_per_epoch=5,
-    #                           epochs=config.n_epochs,
-    #                           verbose=verbose,
-    #                           validation_data=generator_test,
-    #                           validation_steps=5,
-    #                           callbacks=[tensorboard, saver])
+    keras_model = model()
+
+    verbose = 0 if not config.debug else 1
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Callbacks
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv4/', histogram_freq=0,
+                                              batch_size=config.batch_size,
+                                              write_graph=False,
+                                              write_grads=True)
+
+    model_path = os.path.abspath(
+            os.path.join(os.curdir, './builds/' + timestamp))
+    model_path += '-entailmentv4_checkpoint_epoch-{epoch:02d}.hdf5'
+
+    saver = keras.callbacks.ModelCheckpoint(model_path,
+                                            monitor='val_loss', verbose=verbose, save_best_only=True)
+
+    keras_model.fit_generator(generator_training, steps_per_epoch=300,
+                              epochs=config.n_epochs,
+                              verbose=verbose,
+                              validation_data=generator_test,
+                              validation_steps=len(test_set) / config.batch_size,
+                              callbacks=[tensorboard, saver])
