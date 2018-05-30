@@ -9,7 +9,7 @@ import pickle
 from nltk import word_tokenize
 
 
-class SNLIDataloader:
+class SNLIDataloaderPairs:
     """SNLI Dataloader"""
 
     def __init__(self, file, compute_vocab=False):
@@ -24,6 +24,7 @@ class SNLIDataloader:
         self.output_fn = lambda w, x: x
         self.preprocess_fn = lambda x: x
         self.index_to_word = []
+        self.lines_id = []
         self.word_to_index = {}
 
         self._get_line_positions(compute_vocab)
@@ -61,15 +62,18 @@ class SNLIDataloader:
         self.file_length = 0
         vocab = {}
         special_tokens = ['<unk>', '<pad>']
+        position_neg = {}
+        position_pos = {}
         with open(self.file, 'r') as file:
             line = file.readline()
             while line:
                 json_line = json.loads(line)
                 if json_line['gold_label'] != '-':
+                    pair_id = json_line['captionID'].split('.')[0]
                     if json_line['gold_label'] == "contradiction":
-                        self.line_positions_neg.append(file.tell())
-                    else:
-                        self.line_positions_pos.append(file.tell())
+                        position_neg[pair_id] = file.tell()
+                    if json_line['gold_label'] == "neutral":
+                        position_pos[pair_id] = file.tell()
                     if compute_vocab:
                         sentences = json_line['sentence1'] + ' ' + json_line['sentence2']
                         sentences = word_tokenize(sentences)
@@ -80,6 +84,9 @@ class SNLIDataloader:
                             else:
                                 vocab[word] = 1
                 line = file.readline()
+        self.line_positions_pos = list(list(zip(*sorted(position_pos.items(), key=lambda w: w[0])))[1])
+        self.line_positions_neg = list(list(zip(*sorted(position_neg.items(), key=lambda w: w[0])))[1])
+        self.lines_id = list(range(len(self.line_positions_pos)))
         if compute_vocab:
             self.index_to_word = list(list(zip(*sorted(vocab.items(), key=lambda w: w[1], reverse=True)))[0])
             self.index_to_word = [token for token in special_tokens] + self.index_to_word
@@ -98,51 +105,40 @@ class SNLIDataloader:
         Shuffles the lines
         :return:
         """
-        np.random.shuffle(self.line_positions_pos)
-        np.random.shuffle(self.line_positions_neg)
+        np.random.shuffle(self.lines_id)
 
-    def get(self, item, count=1, random=False, only_contradiction=False):
+    def get(self, item, count=1, random=False):
         """
         Get some values from the dataset
         :param item: index of the value
         :param count: number of items to retrieve
         :param random: if random fetching
-        :param only_contradiction: if True, only keeps the contradiction pairs
         :return: the batch
         """
         batch = []
         with open(self.file, 'r') as file:
-            k, j = 0, 0
+            k = 0
             while k < count:
-                if np.random.random() > 0.5:
-                    index = (item + j) % len(self.line_positions_pos)
-                    position = self.line_positions_pos[index] if random else self.original_line_positions_pos[index]
-                else:
-                    index = (item + j) % len(self.line_positions_neg)
-                    position = self.line_positions_neg[index] if random else self.original_line_positions_neg[index]
-                file.seek(position)
-                line = json.loads(file.readline())
-                if not only_contradiction or line['gold_label'] == 'contradiction':
-                    batch.append(self.preprocess_fn(line))
-                    k += 1
-                j += 1
+                index = (item + k) % len(self.line_positions_pos)
+                position_pos = self.line_positions_pos[self.lines_id[index]] if random else self.original_line_positions_pos[index]
+                position_neg = self.line_positions_neg[self.lines_id[index]] if random else self.original_line_positions_neg[index]
+                file.seek(position_pos)
+                line_pos = json.loads(file.readline())
+                file.seek(position_neg)
+                line_neg = json.loads(file.readline())
+                batch.append([self.preprocess_fn(line_pos), self.preprocess_fn(line_neg)])
+                k += 1
         return self.output_fn(self.word_to_index, batch)
 
-    def get_batch(self, batch_size, n_epochs, random=True, only_contradiction=False):
+    def get_batch(self, batch_size, n_epochs, random=True):
         """
         Get a generator for batches
         :param batch_size:
         :param n_epochs:
         :param random:
-        :param only_contradiction: if True, only keeps contradiction pairs
         """
         for epoch in range(n_epochs):
             for k in range(0, len(self), batch_size):
-                yield self.get(k, batch_size, random, only_contradiction)
+                yield self.get(k, batch_size, random)
             self.shuffle_lines()
 
-
-if __name__ == '__main__':
-    dataloader = SNLIDataloader('../data/snli_1.0/snli_1.0_train.jsonl', True)
-    # length = len(dataloader)
-    # print(dataloader.get(0, 3, random=True))
