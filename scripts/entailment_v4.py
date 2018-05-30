@@ -45,15 +45,10 @@ class OutputFN:
             sentence = " ".join(b[0]) + " "
             sentence += " ".join(b[1]) + " "
             sentence += " ".join(b[2]) + " "
-            sentence += " ".join(b[3]) + " "
+            sentence += " ".join(b[3])
             # Concatenate the story for only one sentence
-            if random.random() > 0.5:
-                input_sentences.append(" ".join(b[4]))
-                label.append(2 - int(b[6][0]))
-            else:
-                input_sentences.append(" ".join(b[5]))
-                label.append(int(b[6][0]) - 1)
             ref_sentences.append(sentence)
+            input_sentences.append(" ".join(b[4]))
         ref_sentences, input_sentences = np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)
         with self.graph.as_default():
             # Get the prediction of the negative sentence by our type transfert model
@@ -72,27 +67,38 @@ class OutputFN:
             else:
                 output_sentences.append(input_sentences_emb[b])
                 labels.append(1)
-        return [ref_sentences_emb, output_sentences], labels
+        return [ref_sentences_emb, output_sentences], np.array(labels)
 
 
-def output_fn_test(data):
-    batch = np.array(data.batch)
-    sentences1 = []
-    sentences2 = []
-    label = []
-    for b in batch:
-        sentence = " ".join(b[0]) + " "
-        sentence += " ".join(b[1]) + " "
-        sentence += " ".join(b[2]) + " "
-        sentence += " ".join(b[3]) + " "
-        if random.random() > 0.5:
-            sentences2.append(" ".join(b[4]))
-            label.append(2 - int(b[6][0]))
-        else:
-            sentences2.append(" ".join(b[5]))
-            label.append(int(b[6][0]) - 1)
-        sentences1.append(sentence)
-    return [np.array(sentences1), np.array(sentences2)], np.array(label)
+class OutputFNTest:
+    def __init__(self, elmo_model, type_translation_model, graph):
+        self.elmo_model = elmo_model
+        self.type_translation_model = type_translation_model
+        self.graph = graph
+
+    def __call__(self, data):
+        batch = np.array(data.batch)
+        ref_sentences = []
+        input_sentences = []
+        label = []
+        for b in batch:
+            sentence = " ".join(b[0]) + " "
+            sentence += " ".join(b[1]) + " "
+            sentence += " ".join(b[2]) + " "
+            sentence += " ".join(b[3]) + " "
+            if random.random() > 0.5:
+                input_sentences.append(" ".join(b[4]))
+                label.append(2 - int(b[6][0]))
+            else:
+                input_sentences.append(" ".join(b[5]))
+                label.append(int(b[6][0]) - 1)
+            ref_sentences.append(sentence)
+        ref_sentences, input_sentences = np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)
+        with self.graph.as_default():
+            # Get the elmo embeddings for the input sentences and ref sentences (stories)
+            input_sentences_emb = self.elmo_model.predict(input_sentences, batch_size=len(batch))
+            ref_sentences_emb = self.elmo_model.predict(ref_sentences, batch_size=len(batch))
+        return [ref_sentences_emb, input_sentences_emb], np.array(label)
 
 
 class ElmoEmbedding:
@@ -159,6 +165,7 @@ def main(config):
             })
 
     output_fn = OutputFN(elmo_model_emb, type_translation_model, graph)
+    output_fn_test = OutputFNTest(elmo_model_emb, type_translation_model, graph)
     train_set = Dataloader(config, 'data/train_stories.csv')
     # test_set.set_preprocess_fn(preprocess_fn)
     train_set.load_dataset('data/train.bin')
@@ -179,14 +186,14 @@ def main(config):
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Callbacks
-    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv3/', histogram_freq=0,
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv4/', histogram_freq=0,
                                               batch_size=config.batch_size,
                                               write_graph=False,
                                               write_grads=True)
 
     model_path = os.path.abspath(
             os.path.join(os.curdir, './builds/' + timestamp))
-    model_path += '-entailmentv3_checkpoint_epoch-{epoch:02d}.hdf5'
+    model_path += '-entailmentv4_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)

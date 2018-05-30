@@ -98,7 +98,7 @@ class OutputFN:
             output_sentences.append(b[1][1])
         output_sentences = np.array(output_sentences, dtype=object)
         with self.graph.as_default():
-            out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=8)
+            out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
         return [np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)], out_sent
 
 
