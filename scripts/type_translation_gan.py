@@ -265,7 +265,7 @@ def main(config):
                 g_loss_dev_one, g_acc_dev_one = c_model.test_on_batch([ref_sent, neutral_sent],
                                                                       np.ones(config.batch_size)
                                                                       )  # We want the d_model to fail
-                _, g_acc_real_one = g_model.evaluate([ref_sent_test, neutral_sent_test], real_neg_sent_test)
+                _, g_acc_real_one = g_model.evaluate([ref_sent_test, neutral_sent_test], real_neg_sent_test, verbose=0)
                 g_real_acc.append(g_acc_real_one)
                 g_loss_dev.append(g_loss_dev_one)
                 g_acc_dev.append(g_acc_dev_one)
