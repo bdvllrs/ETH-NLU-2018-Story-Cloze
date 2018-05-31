@@ -6,7 +6,7 @@
   "max_size": 25,
   "learning_rate": 0.01,
   "n_epochs": 10000,
-  "save_model_every": 10,
+  "test_and_save_every": 300,
   "test_every": 2,
 
   "model": "scheduler",

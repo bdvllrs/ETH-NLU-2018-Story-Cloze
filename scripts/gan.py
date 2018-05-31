@@ -24,7 +24,7 @@ from scripts import DefaultScript
 
 
 class Script(DefaultScript):
-    slug = 'entailment_v4'
+    slug = 'gan'
 
     def train(self):
         main(self.config)
@@ -119,7 +119,7 @@ def get_elmo_embedding(elmo_fn):
     return model
 
 
-def model():
+def discriminator():
     sentence1 = keras.layers.Input(shape=(1024,))
     sentence2 = keras.layers.Input(shape=(1024,))
 
@@ -159,13 +159,13 @@ def main(config):
 
     elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
 
-    type_translation_model = keras.models.load_model(
+    generator_model = keras.models.load_model(
             config.type_translation_model, {
                 'elmo_embeddings': elmo_emb_fn
             })
 
-    output_fn = OutputFN(elmo_model_emb, type_translation_model, graph)
-    output_fn_test = OutputFNTest(elmo_model_emb, type_translation_model, graph)
+    output_fn = OutputFN(elmo_model_emb, generator_model, graph)
+    output_fn_test = OutputFNTest(elmo_model_emb, generator_model, graph)
     train_set = Dataloader(config, 'data/train_stories.csv')
     # test_set.set_preprocess_fn(preprocess_fn)
     train_set.load_dataset('data/train.bin')
@@ -183,26 +183,31 @@ def main(config):
 
     # print(next(generator_training))
 
-    keras_model = model()
+    discriminator_model = discriminator()
 
-    verbose = 0 if not config.debug else 1
+    # verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Callbacks
-    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv4/', histogram_freq=0,
-                                              batch_size=config.batch_size,
-                                              write_graph=False,
-                                              write_grads=True)
+    # # Callbacks
+    # tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv4/', histogram_freq=0,
+    #                                           batch_size=config.batch_size,
+    #                                           write_graph=False,
+    #                                           write_grads=True)
 
     model_path = os.path.abspath(
             os.path.join(os.curdir, './builds/' + timestamp))
     model_path += '-entailmentv4_checkpoint_epoch-{epoch:02d}.hdf5'
 
-    saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_loss', verbose=verbose, save_best_only=True)
-
-    keras_model.fit_generator(generator_training, steps_per_epoch=100,
-                              epochs=config.n_epochs,
-                              verbose=verbose,
-                              validation_data=generator_test,
-                              validation_steps=len(test_set) / config.batch_size,
-                              callbacks=[tensorboard, saver])
+    # saver = keras.callbacks.ModelCheckpoint(model_path,
+    #                                         monitor='val_loss', verbose=verbose, save_best_only=True)
+    #
+    # discriminator_model.fit_generator(generator_training, steps_per_epoch=1000,
+    #                           epochs=config.n_epochs,
+    #                           verbose=verbose,
+    #                           validation_data=generator_test,
+    #                           validation_steps=len(test_set) / config.batch_size,
+    #                           callbacks=[tensorboard, saver])
+    for epoch in range(config.n_epochs):
+        # Training
+        for batch in generator_training:
+            pass
+            # Train discriminator
