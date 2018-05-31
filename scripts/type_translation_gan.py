@@ -247,6 +247,7 @@ def main(config):
             # Testing and saving to tensorboard.
             g_loss_dev, d_loss_dev = [], []
             g_acc_dev, d_acc_dev = [], []
+            g_real_acc = []
             for j, ((ref_sent_test, neutral_sent_test), real_neg_sent_test) in enumerate(generator_dev):
                 if j == 5:
                     break
@@ -262,13 +263,15 @@ def main(config):
                 d_acc_dev.append(0.5 * np.add(d_acc_real, d_acc_fakes))
                 # Generator training
                 g_loss_dev_one, g_acc_dev_one = c_model.test_on_batch([ref_sent, neutral_sent],
-                                                              np.ones(config.batch_size)
-                                                              )  # We want the d_model to fail
-
+                                                                      np.ones(config.batch_size)
+                                                                      )  # We want the d_model to fail
+                _, g_acc_real_one = g_model.evaluate([ref_sent_test, neutral_sent_test], real_neg_sent_test)
+                g_real_acc.append(g_acc_real_one)
                 g_loss_dev.append(g_loss_dev_one)
                 g_acc_dev.append(g_acc_dev_one)
             g_mean_loss, d_mean_loss = np.mean(g_loss_dev), np.mean(d_loss_dev)
             g_mean_acc, d_mean_acc = np.mean(g_acc_dev), np.mean(d_acc_dev)
+            g_mean_acc_real = np.mean(g_acc_real_one)
 
             # Save value to tensorboard
             accuracy_summary = tf.Summary()
@@ -280,6 +283,7 @@ def main(config):
             accuracy_summary.value.add(tag='test_loss_generator', simple_value=g_mean_loss)
             accuracy_summary.value.add(tag='test_acc_generator', simple_value=g_mean_acc)
             accuracy_summary.value.add(tag='test_acc_discriminator', simple_value=d_mean_loss)
+            accuracy_summary.value.add(tag='test_acc_embedding', simple_value=g_mean_acc_real)
             writer.add_summary(accuracy_summary, k)
 
             # We save the model is loss is better for generator
