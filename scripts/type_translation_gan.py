@@ -116,8 +116,8 @@ def get_elmo_embedding(elmo_fn):
 
 
 def generator_model():
-    dense_layer_1 = keras.layers.Dense(4000)
-    dense_layer_2 = keras.layers.Dense(3000)
+    dense_layer_1 = keras.layers.Dense(4096)
+    dense_layer_2 = keras.layers.Dense(2048)
     dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
 
     sentence_ref = keras.layers.Input(shape=(1024,))
@@ -132,14 +132,14 @@ def generator_model():
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
                   metrics=['accuracy'])
     return model
 
 
 def discriminator_model():
-    dense_layer_1 = keras.layers.Dense(1000)
-    dense_layer_2 = keras.layers.Dense(500)
+    dense_layer_1 = keras.layers.Dense(1024)
+    dense_layer_2 = keras.layers.Dense(512)
     dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
     sentence_ref = keras.layers.Input(shape=(1024,))
     sentence_out = keras.layers.Input(shape=(1024,))
@@ -152,7 +152,7 @@ def discriminator_model():
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_out], outputs=output)
-    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+    model.compile(optimizer=keras.optimizers.SGD(lr=0.0002), loss="binary_crossentropy",
                   metrics=['accuracy'])
     return model
 
@@ -229,10 +229,15 @@ def main(config):
     d_loss, g_loss = None, None
     d_acc, g_acc = None, None
     min_g_loss = None
+    train_G, train_D = 1, 1
 
     for k, ((ref_sent, neutral_sent), real_neg_sentence) in enumerate(generator_training):
         # We train the discriminator and generator one time step after the other
-        if not k % 4:
+        if (k % 2 or (g_loss is not None and g_loss > train_G)) and (d_loss is None or d_loss < train_D):
+            # Generator training
+            g_loss, g_acc = c_model.train_on_batch([ref_sent, neutral_sent],
+                                                   np.ones(config.batch_size))  # We want the d_model to fail
+        else:
             # Discriminator training
             len_half_batch = config.batch_size//2
             ref_beg, ref_end = ref_sent[:len_half_batch], ref_sent[len_half_batch:]
@@ -246,10 +251,6 @@ def main(config):
                                                                        len_half_batch))  # Generated negative endings
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fakes)
             d_acc = 0.5 * np.add(d_acc_real, d_acc_fakes)
-        else:
-            # Generator training
-            g_loss, g_acc = c_model.train_on_batch([ref_sent, neutral_sent],
-                                                   np.ones(config.batch_size))  # We want the d_model to fail
 
         if k > 0 and not k % config.test_and_save_every:
             # Testing and saving to tensorboard.
