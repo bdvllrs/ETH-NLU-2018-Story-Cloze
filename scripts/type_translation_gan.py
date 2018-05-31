@@ -10,6 +10,7 @@ Credits to
 import datetime
 import os
 import keras
+from keras.layers import LeakyReLU, BatchNormalization, Dropout
 import tensorflow as tf
 import tensorflow_hub as hub
 import keras.backend as K
@@ -115,8 +116,8 @@ def get_elmo_embedding(elmo_fn):
 
 
 def generator_model():
-    dense_layer_1 = keras.layers.Dense(4000, activation='relu')
-    dense_layer_2 = keras.layers.Dense(3000, activation='relu')
+    dense_layer_1 = keras.layers.Dense(4000)
+    dense_layer_2 = keras.layers.Dense(3000)
     dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
 
     sentence_ref = keras.layers.Input(shape=(1024,))
@@ -125,32 +126,32 @@ def generator_model():
     sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
 
     # inputs = sentiments
-    output = keras.layers.Dropout(0.3)(dense_layer_1(sentence))
-    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
     output = dense_layer_3(output)
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy", metrics=['accuracy'])
     return model
 
 
 def discriminator_model():
-    dense_layer_1 = keras.layers.Dense(1000, activation='relu')
-    dense_layer_2 = keras.layers.Dense(500, activation='relu')
+    dense_layer_1 = keras.layers.Dense(1000)
+    dense_layer_2 = keras.layers.Dense(500)
     dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
     sentence_ref = keras.layers.Input(shape=(1024,))
     sentence_out = keras.layers.Input(shape=(1024,))
 
     sentence = keras.layers.concatenate([sentence_ref, sentence_out])
 
-    output = keras.layers.Dropout(0.3)(dense_layer_1(sentence))
-    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
+    output = Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence)))
+    output = Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_2(output)))
     output = dense_layer_3(output)
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_out], outputs=output)
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy", metrics=['accuracy'])
     return model
 
 
@@ -163,7 +164,8 @@ def combined_model(g_model, d_model):
     valid = d_model([sentence_ref, sentence_out])
 
     c_model = keras.models.Model([sentence_ref, sentence_neutral], valid)
-    c_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+    c_model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+                    metrics=['accuracy'])
     return c_model
 
 
@@ -228,7 +230,7 @@ def main(config):
 
     for k, ((ref_sent, neutral_sent), real_neg_sentence) in enumerate(generator_training):
         # We train the discriminator and generator one time step after the other
-        if k % 2:
+        if not k % 2:
             # Discriminator training
             fake_neg_sentence = g_model.predict([ref_sent, neutral_sent], batch_size=config.batch_size)
             d_loss_real, d_acc_real = d_model.train_on_batch([ref_sent, real_neg_sentence],
