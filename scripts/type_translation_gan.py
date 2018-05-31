@@ -271,7 +271,7 @@ def main(config):
                 g_acc_dev.append(g_acc_dev_one)
             g_mean_loss, d_mean_loss = np.mean(g_loss_dev), np.mean(d_loss_dev)
             g_mean_acc, d_mean_acc = np.mean(g_acc_dev), np.mean(d_acc_dev)
-            g_mean_acc_real = np.mean(g_acc_real_one)
+            g_mean_acc_real = np.mean(g_real_acc)
 
             # Save value to tensorboard
             accuracy_summary = tf.Summary()
