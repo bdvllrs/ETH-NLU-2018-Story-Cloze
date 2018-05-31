@@ -132,7 +132,8 @@ def generator_model():
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+                  metrics=['accuracy'])
     return model
 
 
@@ -151,7 +152,8 @@ def discriminator_model():
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_out], outputs=output)
-    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy", metrics=['accuracy'])
+    model.compile(optimizer=keras.optimizers.adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+                  metrics=['accuracy'])
     return model
 
 
@@ -230,14 +232,18 @@ def main(config):
 
     for k, ((ref_sent, neutral_sent), real_neg_sentence) in enumerate(generator_training):
         # We train the discriminator and generator one time step after the other
-        if not k % 2:
+        if not k % 4:
             # Discriminator training
-            fake_neg_sentence = g_model.predict([ref_sent, neutral_sent], batch_size=config.batch_size)
-            d_loss_real, d_acc_real = d_model.train_on_batch([ref_sent, real_neg_sentence],
-                                                             np.ones(config.batch_size))  # Real negative endings
-            d_loss_fakes, d_acc_fakes = d_model.train_on_batch([ref_sent, fake_neg_sentence],
+            len_half_batch = config.batch_size//2
+            ref_beg, ref_end = ref_sent[:len_half_batch], ref_sent[len_half_batch:]
+            neutral_beg, neutral_end = neutral_sent[:len_half_batch], neutral_sent[len_half_batch:]
+            neg_end = real_neg_sentence[len_half_batch:]
+            fake_neg_sentence = g_model.predict([ref_beg, neutral_beg], batch_size=len_half_batch)
+            d_loss_real, d_acc_real = d_model.train_on_batch([ref_end, neg_end],
+                                                             np.ones(len_half_batch))  # Real negative endings
+            d_loss_fakes, d_acc_fakes = d_model.train_on_batch([ref_beg, fake_neg_sentence],
                                                                np.zeros(
-                                                                       config.batch_size))  # Generated negative endings
+                                                                       len_half_batch))  # Generated negative endings
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fakes)
             d_acc = 0.5 * np.add(d_acc_real, d_acc_fakes)
         else:
