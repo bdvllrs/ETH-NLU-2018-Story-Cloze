@@ -115,34 +115,16 @@ def get_elmo_embedding(elmo_fn):
     return model
 
 
-def generator_model():
-    dense_layer_1 = keras.layers.Dense(4096)
-    dense_layer_2 = keras.layers.Dense(2048)
-    dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
-
-    sentence_ref = keras.layers.Input(shape=(1024,))
-    sentence_neutral = keras.layers.Input(shape=(1024,))
-
-    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
-
-    # inputs = sentiments
-    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
-    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
-    output = dense_layer_3(output)
-
-    # Model
-    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
-                  metrics=['accuracy'])
-    return model
+def generator_model(config):
+    return keras.models.load_model(config.type_translation_model)
 
 
 def discriminator_model():
-    dense_layer_1 = keras.layers.Dense(1024)
-    dense_layer_2 = keras.layers.Dense(512)
-    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid')
-    sentence_ref = keras.layers.Input(shape=(1024,))
-    sentence_out = keras.layers.Input(shape=(1024,))
+    dense_layer_1 = keras.layers.Dense(1024, name="d_model_layer_1")
+    dense_layer_2 = keras.layers.Dense(512, name="d_model_layer_2")
+    dense_layer_3 = keras.layers.Dense(1, activation='sigmoid', name="d_model_layer_3")
+    sentence_ref = keras.layers.Input(shape=(1024,), name="d_model_input_1")
+    sentence_out = keras.layers.Input(shape=(1024,), name="d_model_input_2")
 
     sentence = keras.layers.concatenate([sentence_ref, sentence_out])
 
@@ -152,6 +134,7 @@ def discriminator_model():
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_out], outputs=output)
+    model.name = "d_model"
     model.compile(optimizer=keras.optimizers.SGD(lr=0.0002), loss="binary_crossentropy",
                   metrics=['accuracy'])
     return model
@@ -160,7 +143,6 @@ def discriminator_model():
 def combined_model(g_model, d_model):
     sentence_ref = keras.layers.Input(shape=(1024,))
     sentence_neutral = keras.layers.Input(shape=(1024,))
-
     sentence_out = g_model([sentence_ref, sentence_neutral])
     d_model.trainable = False  # Do not train d_model during this step
     valid = d_model([sentence_ref, sentence_out])
@@ -211,7 +193,7 @@ def main(config):
 
     # Models
 
-    g_model = generator_model()  # Generator model
+    g_model = generator_model(config)  # Generator model
     d_model = discriminator_model()  # Discriminator model
     c_model = combined_model(g_model, d_model)  # Combined model
 
@@ -258,6 +240,8 @@ def main(config):
             g_acc_dev, d_acc_dev = [], []
             g_real_acc = []
             for j, ((ref_sent_test, neutral_sent_test), real_neg_sent_test) in enumerate(generator_dev):
+                if j >= 5:
+                    break
                 # Discriminator training
                 fake_neg_sentence_test = g_model.predict([ref_sent_test, neutral_sent_test],
                                                          batch_size=config.batch_size)
