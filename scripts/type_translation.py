@@ -14,6 +14,8 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import keras.backend as K
 import numpy as np
+from keras.layers import BatchNormalization, Dropout, LeakyReLU
+
 from utils import SNLIDataloaderPairs
 from scripts import DefaultScript
 
@@ -96,10 +98,14 @@ class OutputFN:
             ref_sentences.append(b[0][0])
             input_sentences.append(b[0][1])
             output_sentences.append(b[1][1])
+        ref_sentences = np.array(ref_sentences, dtype=object)
+        input_sentences = np.array(input_sentences, dtype=object)
         output_sentences = np.array(output_sentences, dtype=object)
         with self.graph.as_default():
+            ref_sent = self.elmo_emb_model.predict(ref_sentences, batch_size=len(batch))
+            input_sent = self.elmo_emb_model.predict(input_sentences, batch_size=len(batch))
             out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
-        return [np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)], out_sent
+        return [ref_sent, input_sent], out_sent
 
 
 def get_elmo_embedding(elmo_fn):
@@ -110,28 +116,25 @@ def get_elmo_embedding(elmo_fn):
     return model
 
 
-def model(elmo_fn):
-    elmo_embeddings = keras.layers.Lambda(elmo_fn, output_shape=(1024,))
-
-    dense_layer_1 = keras.layers.Dense(4000, activation='relu')
-    dense_layer_2 = keras.layers.Dense(3000, activation='relu')
+def generator_model():
+    dense_layer_1 = keras.layers.Dense(4096)
+    dense_layer_2 = keras.layers.Dense(2048)
     dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
 
-    sentence_ref = keras.layers.Input(shape=(1,), dtype="string")
-    sentence_neutral = keras.layers.Input(shape=(1,), dtype="string")
-    sentence_ref_emb = elmo_embeddings(sentence_ref)
-    sentence_neutral_emb = elmo_embeddings(sentence_neutral)
+    sentence_ref = keras.layers.Input(shape=(1024,))
+    sentence_neutral = keras.layers.Input(shape=(1024,))
 
-    sentence = keras.layers.concatenate([sentence_ref_emb, sentence_neutral_emb])
+    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
 
     # inputs = sentiments
-    output = keras.layers.Dropout(0.3)(dense_layer_1(sentence))
-    output = keras.layers.Dropout(0.3)(dense_layer_2(output))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
     output = dense_layer_3(output)
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer="adam", loss="mean_squared_error", metrics=['accuracy'])
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
+                  metrics=['accuracy'])
     return model
 
 
@@ -173,7 +176,7 @@ def main(config):
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
     generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs)
 
-    keras_model = model(elmo_emb_fn)
+    keras_model = generator_model()
 
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
