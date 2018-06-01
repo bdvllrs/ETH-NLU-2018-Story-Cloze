@@ -126,13 +126,13 @@ def generator_model():
     sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
 
     # inputs = sentiments
-    output = BatchNormalization(momentum=0.8)(Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
-    output = BatchNormalization(momentum=0.8)(Dropout(0.3)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
+    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
     output = dense_layer_3(output)
 
     # Model
     model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
-    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
                   metrics=['accuracy'])
     return model
 
@@ -229,11 +229,11 @@ def main(config):
     d_loss, g_loss = None, None
     d_acc, g_acc = None, None
     min_g_loss = None
-    train_G, train_D = 1, 1
+    # train_G, train_D = 1, 1
 
     for k, ((ref_sent, neutral_sent), real_neg_sentence) in enumerate(generator_training):
         # We train the discriminator and generator one time step after the other
-        if (k % 2 or (g_loss is not None and g_loss > train_G)) and (d_loss is None or d_loss < train_D):
+        if k % 2:
             # Generator training
             g_loss, g_acc = c_model.train_on_batch([ref_sent, neutral_sent],
                                                    np.ones(config.batch_size))  # We want the d_model to fail
@@ -258,8 +258,6 @@ def main(config):
             g_acc_dev, d_acc_dev = [], []
             g_real_acc = []
             for j, ((ref_sent_test, neutral_sent_test), real_neg_sent_test) in enumerate(generator_dev):
-                if j == 5:
-                    break
                 # Discriminator training
                 fake_neg_sentence_test = g_model.predict([ref_sent_test, neutral_sent_test],
                                                          batch_size=config.batch_size)
