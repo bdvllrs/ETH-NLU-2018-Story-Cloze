@@ -240,7 +240,7 @@ def main(config):
             g_acc_dev, d_acc_dev = [], []
             g_real_acc = []
             for j, ((ref_sent_test, neutral_sent_test), real_neg_sent_test) in enumerate(generator_dev):
-                if j >= 5:
+                if j >= 100:
                     break
                 # Discriminator training
                 fake_neg_sentence_test = g_model.predict([ref_sent_test, neutral_sent_test],
