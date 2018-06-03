@@ -219,7 +219,7 @@ class Dataloader:
         for _ in range(epochs):
             for k in range(0, len(self), batch_size):
                 batch = self.get(k, batch_size, random)
-                print(batch)
+                #print(batch)
                 yield batch
 
     def init_dataset(self):
