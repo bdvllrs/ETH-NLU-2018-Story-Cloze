@@ -131,6 +131,20 @@ Here is the default template for the configuration:
 }
 ```
 
+## How to run model
+You have to install github project : <[Infersent](https://github.com/facebookresearch/InferSent)>
+Follow the instructions Dependencies & Download and set :
+
+```python
+GLOVE_PATH = '/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt'
+model = torch.load('/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle')
+```
+to your own configuration in concept_pytorch.py file.
+
+This project is based on pytorch.
+This is mainly base on the publication <[UNSUPERVISED MACHINE TRANSLATION USING MONOLINGUAL CORPORA ONLY](https://arxiv.org/pdf/1711.00043.pdf)>
+But main difference is that we use sentence embedding.
+
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>.
