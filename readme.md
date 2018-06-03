@@ -150,6 +150,20 @@ and accuracy test np arrays will be saved every 5 batches.
 
 Every 5 epochs, model will be saved.
 
+```json
+{
+  "model": "concept_fb",
+  "action": "train",
+  "batch_size":32,
+  "hidden_size": 300,
+  "embedding_size": 4096, can change if you change the sentence embedding
+  "n_layers":2,
+  "attention_bolean": "True", attention mechanism activated or not
+  "plot_every":20, losses plot
+  "plot_every_test":5 accuracy plot
+}
+```
+
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>.
