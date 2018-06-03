@@ -145,6 +145,11 @@ This project is based on pytorch.
 This is mainly base on the publication <[UNSUPERVISED MACHINE TRANSLATION USING MONOLINGUAL CORPORA ONLY](https://arxiv.org/pdf/1711.00043.pdf)>
 But main difference is that we use sentence embedding.
 
+To plot losses (4 losses : 1/ all 2/autoencoder 3/cross 4/adversial), np arrays will be saved very 20 batches
+and accuracy test np arrays will be saved every 5 batches.
+
+Every 5 epochs, model will be saved.
+
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>.

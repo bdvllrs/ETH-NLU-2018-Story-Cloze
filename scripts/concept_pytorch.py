@@ -100,7 +100,7 @@ class Script(DefaultScript):
                             np.save('accuracy test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
-            if (epoch+1)%5==0:
+            if (epoch)%5==0:
                 torch.save(model.state_dict(), 'mytraining_epoch' + str(epoch) +'_acc_'+str(plot_accurracies_avg[-1])+ '.pth')
 
 
