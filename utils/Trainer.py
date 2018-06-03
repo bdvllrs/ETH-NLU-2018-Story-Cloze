@@ -253,8 +253,6 @@ class Seq2SeqTrainer(nn.Module):
 
 
     def train_all(self,input_all):
-        #TODO :  attention weights between the source and target decode are equal
-        #Todo : sortir les loss et les backward a la fin
         # Initialize optimizers and criterion
         encoder_optimizer_source = self.encoder_optimizer_source
         decoder_optimizer_source = self.decoder_optimizer_source

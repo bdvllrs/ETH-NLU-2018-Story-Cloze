@@ -8,6 +8,13 @@ config/*.json
 setup.sh
 setup.py
 data/
+accuracy_val.npy
+accuracy_test.npy
+adv_loss.npy
+auto_loss.npy
+cross_loss.npy
+main_loss.npy
 
 # Add default config
 !config/default.json
+*.ipynb

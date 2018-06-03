@@ -32,6 +32,7 @@ class Script(DefaultScript):
         plot_losses_train_cross=[]
         plot_losses_train_auto=[]
         plot_accurracies_avg=[]
+        plot_accurracies_avg_val = []
         start = time.time()
         Seq2SEq_main_model = Seq2SeqTrainer(self.config.hidden_size, self.config.embedding_size,
                                             self.config.n_layers, self.config.batch_size,
@@ -43,6 +44,7 @@ class Script(DefaultScript):
         plot_discriminator_loss_total=0
         plot_loss_total_auto=0
         plot_loss_total_cross=0
+        compteur_val=0
         while epoch < self.config.n_epochs:
             print("Epoch:", epoch)
             epoch += 1
@@ -50,6 +52,8 @@ class Script(DefaultScript):
                 print(phase)
                 if phase == 'train':
                     for num, batch in enumerate(generator_training):
+                        print('NUM BATCH')
+                        print(num)
                         main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin, discriminator_loss_total=Seq2SEq_main_model.train_all(batch)
                         plot_loss_total += main_loss_total
                         plot_discriminator_loss_total+=discriminator_loss_total
@@ -76,6 +80,54 @@ class Script(DefaultScript):
                             plot_discriminator_loss_total=0
                             plot_loss_total_auto =0
                             plot_loss_total_cross =0
+                            compteur_val+=1
+                        try:
+                            if compteur_val==3:
+                                compteur_val=0
+                                correct = 0
+                                total = 0
+                                for num, batch in enumerate(generator_dev):
+                                    if num<21:
+                                        all_histoire_debut_embedding = Variable(torch.LongTensor(batch[0])).transpose(0,
+                                                                                                                      1).cuda()
+                                        all_histoire_fin_embedding1 = Variable(torch.LongTensor(batch[1])).transpose(0,
+                                                                                                                     1).cuda()
+                                        all_histoire_fin_embedding2 = Variable(torch.LongTensor(batch[2])).transpose(0,
+                                                                                                                     1).cuda()
+                                        labels = Variable(torch.LongTensor(batch[3])).cuda()
+                                        end = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                          Seq2SEq_main_model.decoder_target,
+                                                                          all_histoire_debut_embedding,
+                                                                          Seq2SEq_main_model.input_length_debut)
+                                        debut1 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                             Seq2SEq_main_model.decoder_target,
+                                                                             all_histoire_fin_embedding1,
+                                                                             Seq2SEq_main_model.input_length_fin)
+                                        debut2 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                             Seq2SEq_main_model.decoder_target,
+                                                                             all_histoire_fin_embedding2,
+                                                                             Seq2SEq_main_model.input_length_fin)
+                                        preds = self.get_predict(end, debut1, debut2,
+                                                                 all_histoire_debut_embedding.transpose(0, 1),
+                                                                 all_histoire_fin_embedding1.transpose(0, 1),
+                                                                 all_histoire_fin_embedding2.transpose(0, 1))
+                                        correct += (preds == labels).sum().item()
+                                        total += self.config.batch_size
+                                        print(num)
+                                        print(correct / total)
+                                        if num % self.config.plot_every_test == self.config.plot_every_test - 1:
+                                            plot_acc_avg = correct / total
+                                            plot_accurracies_avg_val.append(plot_acc_avg)
+                                            np.save('accuracy_val', np.array(plot_accurracies_avg_val))
+                                            correct = 0
+                                            total = 0
+                                    else:
+                                        print('done validation')
+                                        break
+                        except Exception as e:
+                            print(e)
+                            pass
+
                 else:
                     correct=0
                     total=0
@@ -97,15 +149,15 @@ class Script(DefaultScript):
                         if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                             plot_acc_avg = correct/total
                             plot_accurracies_avg.append(plot_acc_avg)
-                            np.save('accuracy test', np.array(plot_accurracies_avg))
+                            np.save('accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
-            if (epoch)%5==0:
-                torch.save(model.state_dict(), 'mytraining_epoch' + str(epoch) +'_acc_'+str(plot_accurracies_avg[-1])+ '.pth')
+                torch.save(model.state_dict(), 'mytraining_epoch' + str(epoch)+ '.pth')
 
 
     def get_predict(self, end, debut1, debut2, all_histoire_debut_embedding, all_histoire_fin_embedding1,
                     all_histoire_fin_embedding2):
+        #Todo : predict selon end, selon debur, selon les 2 (dernier fait ici)
         """
         :param end:
         :param debut1:

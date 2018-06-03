@@ -146,9 +146,11 @@ This is mainly base on the publication <[UNSUPERVISED MACHINE TRANSLATION USING 
 But main difference is that we use sentence embedding.
 
 To plot losses (4 losses : 1/ all 2/autoencoder 3/cross 4/adversial), np arrays will be saved very 20 batches
-and accuracy test np arrays will be saved every 5 batches.
+and accuracy test np arrays will be saved every 5 batches at the end of an epoch (accuracy_test.npy).
+An accuracy validation is also written every 60 batches on 20 batches
+Every epoch, model will be save.
 
-Every 5 epochs, model will be saved.
+10 min for 20 batches.
 
 ```json
 {
