@@ -48,8 +48,11 @@ class Seq2SeqTrainer(nn.Module):
         self.evaluate_every = evaluate_every
         # config type model
         self.attention_bolean = attention_bolean
-        self.input_length_debut = Variable(torch.from_numpy(np.array([4] * self.batch_size, dtype=np.int32)).long()).cuda()
-        self.input_length_fin = Variable(torch.LongTensor(np.array([1] * self.batch_size, dtype=np.int32)).long()).cuda()
+        self.input_length_debut = Variable(torch.from_numpy(np.array([4] * self.batch_size, dtype=np.int32)).long())
+        self.input_length_fin = Variable(torch.LongTensor(np.array([1] * self.batch_size, dtype=np.int32)).long())
+        if USE_CUDA:
+            self.input_length_debut = self.input_length_debut.cuda()
+            self.input_length_fin = self.input_length_fin.cuda()
         # Initialize models
         self.encoder_source = EncoderRNN(4, embed_size, hidden_size, n_layers=n_layers, dropout=dropout)
         self.decoder_source = DecoderStep(4,hidden_size, embed_size, n_layers, dropout_p=dropout,
@@ -197,8 +200,11 @@ class Seq2SeqTrainer(nn.Module):
         :return:
         """
 
-        noise_input = Variable(torch.FloatTensor(noise_input)).cuda()
-        input = Variable(torch.FloatTensor(input)).cuda()
+        noise_input = Variable(torch.FloatTensor(noise_input))
+        input = Variable(torch.FloatTensor(input))
+        if USE_CUDA:
+            noise_input=noise_input.cuda()
+            input=input.cuda()
         loss_start1= self.train_step(encoder, decoder, noise_input.transpose(0,1),input_lengths,
                                                                                                input.transpose(0, 1),
                                                                                                target_lengths,
@@ -219,10 +225,15 @@ class Seq2SeqTrainer(nn.Module):
         :param criterion_adver:
         :return:
         """
-        input = Variable(torch.FloatTensor(input)).transpose(0,1).cuda()
+
+        input = Variable(torch.FloatTensor(input)).transpose(0,1)
+        if USE_CUDA:
+            input=input.cuda()
         out = self.evaluate(self.encoder_source, self.decoder_target, input,
                                   input_length)
-        noise = Variable(torch.FloatTensor(noise)).cuda()
+        noise = Variable(torch.FloatTensor(noise))
+        if USE_CUDA:
+            noise=noise.cuda()
         noise_input = noise.float()+out.detach().float()
         loss_start1 = self.train_step(encoder, decoder,noise_input.transpose(0,1),output_length,input,
                                                                                                input_length,

@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import torch
 import time
 from utils.Trainer import Seq2SeqTrainer
-
+USE_CUDA = torch.cuda.is_available()
 
 class Script(DefaultScript):
     slug = 'concept_fb'
@@ -64,10 +64,10 @@ class Script(DefaultScript):
                             # plot_losses_train_adv.append(plot_loss_adv_avg)
                             plot_losses_train_auto.append(plot_loss_auto_avg)
                             plot_losses_train_cross.append(plot_loss_cross_avg)
-                            np.save('main_loss', np.array(plot_losses_train))
-                            # np.save('adv_loss', np.array(plot_losses_train_adv))
-                            np.save('auto_loss', np.array(plot_losses_train_auto))
-                            np.save('cross_loss', np.array(plot_losses_train_cross))
+                            np.save('./build/main_loss', np.array(plot_losses_train))
+                            # np.save('./build/adv_loss', np.array(plot_losses_train_adv))
+                            np.save('./build/auto_loss', np.array(plot_losses_train_auto))
+                            np.save('./build/cross_loss', np.array(plot_losses_train_cross))
                             print_summary = '%s (%d %d%%) %.4f %.4f %.4f' % (
                                 Seq2SEq_main_model.time_since(start, (num + 1) / (90000 / 32)), (num + 1),
                                 (num + 1) / (90000 / 32) * 100,
@@ -77,72 +77,73 @@ class Script(DefaultScript):
                             plot_loss_total_auto = 0
                             plot_loss_total_cross = 0
                             compteur_val += 1
-                        try:
-                            if compteur_val == 3:
-                                compteur_val = 0
-                                correct = 0
-                                total = 0
-                                for num, batch in enumerate(generator_dev):
-                                    if num < 21:
-                                        all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).transpose(
-                                            0,
-                                            1).cuda()
-                                        all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1])).transpose(0,
-                                                                                                                      1).cuda()
-                                        all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2])).transpose(0,
-                                                                                                                      1).cuda()
-                                        labels = Variable(torch.FloatTensor(batch[3])).cuda()
-                                        end = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
-                                                                          Seq2SEq_main_model.decoder_target,
-                                                                          all_histoire_debut_embedding,
-                                                                          Seq2SEq_main_model.input_length_debut)
-                                        debut1 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
-                                                                             Seq2SEq_main_model.decoder_target,
-                                                                             all_histoire_fin_embedding1,
-                                                                             Seq2SEq_main_model.input_length_fin)
-                                        debut2 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
-                                                                             Seq2SEq_main_model.decoder_target,
-                                                                             all_histoire_fin_embedding2,
-                                                                             Seq2SEq_main_model.input_length_fin)
-                                        preds = self.get_predict(end, debut1, debut2,
-                                                                 all_histoire_debut_embedding.transpose(0, 1),
-                                                                 all_histoire_fin_embedding1.transpose(0, 1),
-                                                                 all_histoire_fin_embedding2.transpose(0, 1))
-                                        correct += (preds == labels).sum().item()
-                                        total += self.config.batch_size
-                                        print(num)
-                                        print(correct / total)
-                                        if num % self.config.plot_every_test == self.config.plot_every_test - 1:
-                                            plot_acc_avg = correct / total
-                                            plot_accurracies_avg_val.append(plot_acc_avg)
-                                            np.save('accuracy_val', np.array(plot_accurracies_avg_val))
-                                            if plot_acc_avg > max_acc:
-                                                torch.save(Seq2SEq_main_model.encoder_source.state_dict(),
-                                                           'encoder_source_best.pth')
-                                                torch.save(Seq2SEq_main_model.encoder_target.state_dict(),
-                                                           'encoder_target_best.pth')
-                                                torch.save(Seq2SEq_main_model.decoder_source.state_dict(),
-                                                           'decoder_source_best.pth')
-                                                torch.save(Seq2SEq_main_model.decoder_target.state_dict(),
-                                                           'decoder_target_best.pth')
-                                                max_acc = plot_acc_avg
-                                                print('SAVE MODEL FOR ACCURACY : ' + str(plot_acc_avg))
-                                            correct = 0
-                                            total = 0
-                                    else:
-                                        print('done validation')
-                                        break
-                        except Exception as e:
-                            print(e)
-                            pass
+                        #try:
+                        if compteur_val == 3:
+                            compteur_val = 0
+                            correct = 0
+                            total = 0
+                            for num, batch in enumerate(generator_dev):
+                                if num < 21:
 
+                                    all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).transpose(0, 1)
+                                    all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1])).transpose(0, 1)
+                                    all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2])).transpose(0, 1)
+                                    if USE_CUDA:
+                                        all_histoire_debut_embedding=all_histoire_debut_embedding.cuda()
+                                        all_histoire_fin_embedding1=all_histoire_fin_embedding1.cuda()
+                                        all_histoire_fin_embedding2=all_histoire_fin_embedding2.cuda()
+                                    labels = Variable(torch.LongTensor(batch[3]))
+                                    end = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                      Seq2SEq_main_model.decoder_target,
+                                                                      all_histoire_debut_embedding,
+                                                                      Seq2SEq_main_model.input_length_debut)
+                                    debut1 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                         Seq2SEq_main_model.decoder_target,
+                                                                         all_histoire_fin_embedding1,
+                                                                         Seq2SEq_main_model.input_length_fin)
+                                    debut2 = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
+                                                                         Seq2SEq_main_model.decoder_target,
+                                                                         all_histoire_fin_embedding2,
+                                                                         Seq2SEq_main_model.input_length_fin)
+                                    preds = self.get_predict(end, debut1, debut2,
+                                                             all_histoire_debut_embedding.transpose(0, 1),
+                                                             all_histoire_fin_embedding1.transpose(0, 1),
+                                                             all_histoire_fin_embedding2.transpose(0, 1))
+                                    preds = preds.cpu().long()
+                                    correct += (preds == labels).sum().item()
+                                    total += self.config.batch_size
+                                    print(correct / total)
+                                    if num % self.config.plot_every_test == self.config.plot_every_test - 1:
+                                        plot_acc_avg = correct / total
+                                        plot_accurracies_avg_val.append(plot_acc_avg)
+                                        np.save('./build/accuracy_val', np.array(plot_accurracies_avg_val))
+                                        if plot_acc_avg > max_acc:
+                                            torch.save(Seq2SEq_main_model.encoder_source.state_dict(),
+                                                       './build/encoder_source_best.pth')
+                                            torch.save(Seq2SEq_main_model.encoder_target.state_dict(),
+                                                       './build/encoder_target_best.pth')
+                                            torch.save(Seq2SEq_main_model.decoder_source.state_dict(),
+                                                       './build/decoder_source_best.pth')
+                                            torch.save(Seq2SEq_main_model.decoder_target.state_dict(),
+                                                       './build/decoder_target_best.pth')
+                                            max_acc = plot_acc_avg
+                                            print('SAVE MODEL FOR ACCURACY : ' + str(plot_acc_avg))
+                                        correct = 0
+                                        total = 0
+                                else:
+                                    print('done validation')
+                                    break
                 else:
                     correct = 0
                     total = 0
                     for num, batch in enumerate(generator_dev):
-                        all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).transpose(0, 1).cuda()
-                        all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1])).transpose(0, 1).cuda()
-                        all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2])).transpose(0, 1).cuda()
+                        all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).transpose(0, 1)
+                        all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1])).transpose(0, 1)
+                        all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2])).transpose(0, 1)
+                        if USE_CUDA:
+                            all_histoire_debut_embedding = all_histoire_debut_embedding.cuda()
+                            all_histoire_fin_embedding1 = all_histoire_fin_embedding1.cuda()
+                            all_histoire_fin_embedding2 = all_histoire_fin_embedding2.cuda()
                         labels = Variable(torch.LongTensor(batch[3]))
                         end = Seq2SEq_main_model.evaluate(Seq2SEq_main_model.encoder_source,
                                                           Seq2SEq_main_model.decoder_target,
@@ -169,7 +170,7 @@ class Script(DefaultScript):
                             np.save('accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
-                torch.save(Seq2SEq_main_model.encoder_source.state_dict(), 'encoder_source_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.encoder_source.state_dict(), './encoder_source_epoch' + str(epoch) + '.pth')
                 torch.save(Seq2SEq_main_model.encoder_target.state_dict(), 'encoder_target_epoch' + str(epoch) + '.pth')
                 torch.save(Seq2SEq_main_model.decoder_source.state_dict(), 'decoder_source_epoch' + str(epoch) + '.pth')
                 torch.save(Seq2SEq_main_model.decoder_target.state_dict(), 'decoder_target_epoch' + str(epoch) + '.pth')
@@ -191,17 +192,17 @@ class Script(DefaultScript):
         semblable_fin2 = []
         semblable_debut1 = []
         semblable_debut2 = []
-        debut1 = debut1
-        debut2 = debut2
-        all_histoire_debut_embedding = all_histoire_debut_embedding
-        end = end
-        all_histoire_fin_embedding1 = all_histoire_fin_embedding1
-        all_histoire_fin_embedding2 = all_histoire_fin_embedding2
+        debut1 = debut1.cpu()
+        debut2 = debut2.cpu()
+        all_histoire_debut_embedding = all_histoire_debut_embedding.cpu()
+        end = end.cpu()
+        all_histoire_fin_embedding1 = all_histoire_fin_embedding1.cpu()
+        all_histoire_fin_embedding2 = all_histoire_fin_embedding2.cpu()
         for num_batch, batch in enumerate(end):
             for num_sent, sent in enumerate(batch):
                 produit = torch.dot(sent.float(), all_histoire_fin_embedding1[num_batch][num_sent].float()) / (
-                            torch.norm(sent.float()) * torch.norm(
-                        all_histoire_fin_embedding1[num_batch][num_sent].float()))
+                            torch.norm(sent) * torch.norm(
+                        all_histoire_fin_embedding1[num_batch][num_sent]))
                 semblable_fin1.append(produit.cpu().data[0])
                 produit = torch.dot(sent.float(), all_histoire_fin_embedding2[num_batch][num_sent].float()) / (
                         torch.norm(sent.float()) * torch.norm(all_histoire_fin_embedding2[num_batch][num_sent].float()))
