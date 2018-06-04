@@ -131,6 +131,47 @@ Here is the default template for the configuration:
 }
 ```
 
+## How to run model
+You have to install github project : <[Infersent](https://github.com/facebookresearch/InferSent)>
+Follow the instructions Dependencies & Download and set :
+```json
+{
+"GLOVE_PATH":"/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt",
+  "model_path":"/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle",
+}
+```
+to your own configuration in config.json file.
+
+This project is based on pytorch.
+This is mainly base on the publication <[UNSUPERVISED MACHINE TRANSLATION USING MONOLINGUAL CORPORA ONLY](https://arxiv.org/pdf/1711.00043.pdf)>
+But main difference is that we use sentence embedding.
+
+To plot losses (4 losses : 1/ all 2/autoencoder 3/cross 4/adversial), np arrays will be saved very 20 batches
+and accuracy test np arrays will be saved every 5 batches at the end of an epoch (accuracy_test.npy).
+An accuracy validation is also written every 60 batches on 20 batches
+Every epoch, model will be save.
+
+10 min for 20 batches GPU GTX.
+
+```json
+{
+  "model": "concept_fb",
+  "action": "train",
+  "batch_size":32,
+  "hidden_size": 300,
+  "embedding_size": 4096, can change if you change the sentence embedding
+  "n_layers":2,
+  "attention_bolean": "True", attention mechanism activated or not
+  "plot_every":20, losses plot
+  "plot_every_test":5 accuracy plot
+  "GLOVE_PATH":"/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt",
+  "model_path":"/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle",
+}
+```
+
+TODO: Change way of calcul loss : cos->cos²->||(u-v)||=0
+TODO: make modular adversial loss
+
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.
 - Benjamin Devillers <[bdvllrs](https://github.com/bdvllrs)>.
