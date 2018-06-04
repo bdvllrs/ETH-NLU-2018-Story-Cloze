@@ -45,8 +45,7 @@ class Script(DefaultScript):
 
         elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
 
-        type_translation_model = keras.models.load_model(
-                './builds/leonhard/2018-06-01 12:28:13-type-translation_checkpoint_epoch-03.hdf5')
+        type_translation_model = keras.models.load_model(self.config.type_translation_model)
 
         output_fn = OutputFN(elmo_model_emb, type_translation_model, graph)
 
@@ -59,10 +58,8 @@ class Script(DefaultScript):
         generator_test = test_set.get_batch(self.config.batch_size, 1)
         accuracy = []
         for batch in generator_test:
-            print(batch)
             accuracy.append(batch)
-
-        print("global acc", np.mean(accuracy))
+            print(np.mean(accuracy))
 
 
 class ElmoEmbedding:
@@ -88,7 +85,10 @@ class OutputFN:
         sentence2 = []
         label = []
         for b in batch:
-            sentence = " ".join(b[3])
+            sentence = " ".join(b[0])
+            sentence += " ".join(b[1])
+            sentence += " ".join(b[2])
+            sentence += " ".join(b[3])
             # Concatenate the story for only one sentence
             ref_sentences.append(sentence)
             sentence1.append(" ".join(b[4]))

@@ -105,8 +105,8 @@ class OutputFN:
                 input_sentences.append(b[0][1])
                 output_sentences.append(b[1][1])
             else:
-                input_sentences.append(b[0][1])
-                output_sentences.append(b[0][1])
+                input_sentences.append(b[1][1])
+                output_sentences.append(b[1][1])
         ref_sentences = np.array(ref_sentences, dtype=object)
         input_sentences = np.array(input_sentences, dtype=object)
         output_sentences = np.array(output_sentences, dtype=object)
