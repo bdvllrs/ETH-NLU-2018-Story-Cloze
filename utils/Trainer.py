@@ -197,8 +197,8 @@ class Seq2SeqTrainer(nn.Module):
         :return:
         """
 
-        noise_input = Variable(torch.LongFloat(noise_input)).cuda()
-        input = Variable(torch.LongFloat(input)).cuda()
+        noise_input = Variable(torch.FloatTensor(noise_input)).cuda()
+        input = Variable(torch.FloatTensor(input)).cuda()
         loss_start1= self.train_step(encoder, decoder, noise_input.transpose(0,1),input_lengths,
                                                                                                input.transpose(0, 1),
                                                                                                target_lengths,
@@ -219,10 +219,10 @@ class Seq2SeqTrainer(nn.Module):
         :param criterion_adver:
         :return:
         """
-        input = Variable(torch.LongFloat(input)).transpose(0,1).cuda()
+        input = Variable(torch.FloatTensor(input)).transpose(0,1).cuda()
         out = self.evaluate(self.encoder_source, self.decoder_target, input,
                                   input_length)
-        noise = Variable(torch.LongFloat(noise)).cuda()
+        noise = Variable(torch.FloatTensor(noise)).cuda()
         noise_input = noise.float()+out.detach().float()
         loss_start1 = self.train_step(encoder, decoder,noise_input.transpose(0,1),output_length,input,
                                                                                                input_length,
