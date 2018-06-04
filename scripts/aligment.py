@@ -73,11 +73,11 @@ class Script(DefaultScript):
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
 
-        model.fit_generator(generator_training, steps_per_epoch=1,
+        model.fit_generator(generator_training, steps_per_epoch=100,
                             epochs=self.config.n_epochs,
                             verbose=verbose,
                             validation_data=generator_test,
-                            validation_steps=1,
+                            validation_steps=len(test_set)/self.config.batch_size,
                             callbacks=[tensorboard, saver])
 
     def build_graph(self):
