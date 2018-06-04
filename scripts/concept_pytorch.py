@@ -1,5 +1,4 @@
 import datetime
-
 from utils import Dataloader
 from scripts import DefaultScript
 import numpy as np
@@ -55,7 +54,6 @@ class Script(DefaultScript):
                     for num_1, batch in enumerate(generator_training):
                         main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin = Seq2SEq_main_model.train_all(
                             batch)
-
                         accuracy_summary = tf.Summary()
                         accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
                         accuracy_summary.value.add(tag='train_loss_auto', simple_value=loss_auto_debut+loss_auto_fin)
@@ -138,12 +136,15 @@ class Script(DefaultScript):
                                         dcorrectfin += (predfin_dis == labels).sum().item()
                                         dcorrectdebut += (preddebut_dis == labels).sum().item()
 
+
+                                        total += self.config.batch_size
+
                                         print("Accuracy colinéaire somme, fin, debut")
                                         print(correct/ total,correctfin/ total,correctdebut/ total)
                                         print("Accuracy distance somme, fin, debut")
                                         print(dcorrect/ total, dcorrectfin/ total, dcorrectdebut/ total)
 
-                                        total += self.config.batch_size
+
                                         accuracy_summary = tf.Summary()
                                         accuracy_summary.value.add(tag='val_accuracy',
                                                                    simple_value=(correct / total))
