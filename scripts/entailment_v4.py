@@ -51,12 +51,12 @@ class OutputFN:
             input_sentences.append(" ".join(b[4]))
         ref_sentences, input_sentences = np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)
         with self.graph.as_default():
-            # Get the prediction of the negative sentence by our type transfert model
-            negative_sentence_emb = self.type_translation_model.predict([ref_sentences, input_sentences],
-                                                                        batch_size=len(batch))
             # Get the elmo embeddings for the input sentences and ref sentences (stories)
             input_sentences_emb = self.elmo_model.predict(input_sentences, batch_size=len(batch))
             ref_sentences_emb = self.elmo_model.predict(ref_sentences, batch_size=len(batch))
+            # Get the prediction of the negative sentence by our type transfert model
+            negative_sentence_emb = self.type_translation_model.predict([ref_sentences_emb, input_sentences_emb],
+                                                                        batch_size=len(batch))
         labels = []
         output_sentences = []
         for b in range(len(batch)):
@@ -200,9 +200,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=100,
+    keras_model.fit_generator(generator_training, steps_per_epoch=5,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_test,
-                              validation_steps=len(test_set) / config.batch_size,
+                              validation_steps=5,
                               callbacks=[tensorboard, saver])
