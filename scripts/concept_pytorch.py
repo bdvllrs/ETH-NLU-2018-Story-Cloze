@@ -1,3 +1,5 @@
+import datetime
+
 from utils import Dataloader
 from scripts import DefaultScript
 import numpy as np
@@ -6,6 +8,9 @@ import torch
 import time
 from utils.Trainer import Seq2SeqTrainer
 USE_CUDA = torch.cuda.is_available()
+import tensorflow as tf
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/', graph)
 
 class Script(DefaultScript):
     slug = 'concept_fb'
@@ -231,7 +236,7 @@ class OutputFN:
         if USE_CUDA:
             self.model = torch.load(model_path)
         else:
-            self.model=torch.load('infersent.allnli.pickle', map_location=lambda storage, loc: storage)
+            self.model=torch.load(model_path, map_location=lambda storage, loc: storage)
         self.model.set_glove_path(self.GLOVE_PATH)
         self.model.build_vocab_k_words(K=100000)
 
