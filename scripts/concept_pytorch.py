@@ -174,10 +174,10 @@ class Script(DefaultScript):
                             np.save('./builds/accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
-                torch.save(Seq2SEq_main_model.encoder_source.state_dict(), './encoder_source_epoch' + str(epoch) + '.pth')
-                torch.save(Seq2SEq_main_model.encoder_target.state_dict(), 'encoder_target_epoch' + str(epoch) + '.pth')
-                torch.save(Seq2SEq_main_model.decoder_source.state_dict(), 'decoder_source_epoch' + str(epoch) + '.pth')
-                torch.save(Seq2SEq_main_model.decoder_target.state_dict(), 'decoder_target_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.encoder_source.state_dict(), './builds/encoder_source_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.encoder_target.state_dict(), './builds/encoder_target_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.decoder_source.state_dict(), './builds/decoder_source_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.decoder_target.state_dict(), './builds/decoder_target_epoch' + str(epoch) + '.pth')
 
     def get_predict(self, end, debut1, debut2, all_histoire_debut_embedding, all_histoire_fin_embedding1,
                     all_histoire_fin_embedding2):
