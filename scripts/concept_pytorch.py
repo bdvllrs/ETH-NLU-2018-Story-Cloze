@@ -228,7 +228,10 @@ class OutputFN:
 
     def __init__(self, GLOVE_PATH, model_path):
         self.GLOVE_PATH = GLOVE_PATH
-        self.model = torch.load(model_path)
+        if USE_CUDA:
+            self.model = torch.load(model_path)
+        else:
+            self.model=torch.load('infersent.allnli.pickle', map_location=lambda storage, loc: storage)
         self.model.set_glove_path(self.GLOVE_PATH)
         self.model.build_vocab_k_words(K=100000)
 
