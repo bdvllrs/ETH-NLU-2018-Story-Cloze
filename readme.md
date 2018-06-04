@@ -134,12 +134,13 @@ Here is the default template for the configuration:
 ## How to run model
 You have to install github project : <[Infersent](https://github.com/facebookresearch/InferSent)>
 Follow the instructions Dependencies & Download and set :
-
-```python
-GLOVE_PATH = '/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt'
-model = torch.load('/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle')
+```json
+{
+"GLOVE_PATH":"/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt",
+  "model_path":"/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle",
+}
 ```
-to your own configuration in concept_pytorch.py file.
+to your own configuration in config.json file.
 
 This project is based on pytorch.
 This is mainly base on the publication <[UNSUPERVISED MACHINE TRANSLATION USING MONOLINGUAL CORPORA ONLY](https://arxiv.org/pdf/1711.00043.pdf)>
@@ -150,7 +151,7 @@ and accuracy test np arrays will be saved every 5 batches at the end of an epoch
 An accuracy validation is also written every 60 batches on 20 batches
 Every epoch, model will be save.
 
-10 min for 20 batches.
+10 min for 20 batches GPU GTX.
 
 ```json
 {
@@ -163,8 +164,13 @@ Every epoch, model will be save.
   "attention_bolean": "True", attention mechanism activated or not
   "plot_every":20, losses plot
   "plot_every_test":5 accuracy plot
+  "GLOVE_PATH":"/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt",
+  "model_path":"/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle",
 }
 ```
+
+TODO: Change way of calcul loss : cos->cos²->||(u-v)||=0
+TODO: make modular adversial loss
 
 ## Credits
 - Adrien Benamira <[AdriBenben](https://github.com/AdriBenben)>.

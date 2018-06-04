@@ -5,15 +5,17 @@ from torch.autograd import Variable
 import torch
 import time
 from utils.Trainer import Seq2SeqTrainer
-GLOVE_PATH = '/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt'
-model = torch.load('/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle')
-model.set_glove_path(GLOVE_PATH)
-model.build_vocab_k_words(K=100000)
+
 
 
 class Script(DefaultScript):
     slug = 'concept_fb'
     def train(self):
+        #self.GLOVE_PATH = '/home/benamira/Bureau/InferSent/dataset/GloVe/glove.840B.300d.txt'
+        #self.model = torch.load('/home/benamira/Bureau/InferSent/encoder/infersent.allnli.pickle')
+        #self.model.set_glove_path(self.GLOVE_PATH)
+        #self.model.build_vocab_k_words(K=100000)
+        output_fn = OutputFN(self.config.GLOVE_PATH,self.config.model_path)
         train_set = Dataloader(self.config, 'data/train_stories.csv')
         test_set = Dataloader(self.config, 'data/test_stories.csv', testing_data=True)
         train_set.set_special_tokens(["<unk>"])
@@ -22,7 +24,7 @@ class Script(DefaultScript):
         train_set.load_vocab('./data/default.voc', self.config.vocab_size)
         test_set.load_dataset('data/test.bin')
         test_set.load_vocab('./data/default.voc', self.config.vocab_size)
-        test_set.set_output_fn(output_fn_test)
+        test_set.set_output_fn(output_fn.output_fn_test)
         train_set.set_output_fn(output_fn)
         generator_training = train_set.get_batch(self.config.batch_size, self.config.n_epochs)
         generator_dev = test_set.get_batch(self.config.batch_size, self.config.n_epochs)
@@ -152,7 +154,10 @@ class Script(DefaultScript):
                             np.save('accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
-                torch.save(model.state_dict(), 'mytraining_epoch' + str(epoch)+ '.pth')
+                torch.save(Seq2SEq_main_model.encoder_source.state_dict(), 'encoder_source_epoch' + str(epoch)+ '.pth')
+                torch.save(Seq2SEq_main_model.encoder_target.state_dict(), 'encoder_target_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.decoder_source.state_dict(), 'decoder_source_epoch' + str(epoch) + '.pth')
+                torch.save(Seq2SEq_main_model.decoder_target.state_dict(), 'decoder_target_epoch' + str(epoch) + '.pth')
 
 
     def get_predict(self, end, debut1, debut2, all_histoire_debut_embedding, all_histoire_fin_embedding1,
@@ -185,110 +190,113 @@ class Script(DefaultScript):
         (_,pred)= torch.max(p, 0)
         return (pred)
 
+class OutputFN(DefaultScript):
+    slug = 'concept_fb'
+    def __init__(self,GLOVE_PATH,model_path):
+        self.GLOVE_PATH = GLOVE_PATH
+        self.model = torch.load(model_path)
+        self.model.set_glove_path(self.GLOVE_PATH)
+        self.model.build_vocab_k_words(K=100000)
 
-def output_fn(data):
-    """
-    :param data:
-    :return:
-    """
-    batch = np.array(data.batch)
-    all_histoire_debut_embedding = []
-    all_histoire_fin_embedding = []
-    all_histoire_noise_debut = []
-    all_histoire_noise_fin = []
-    all_noise_debut=[]
-    all_noise_fin=[]
-    for b in batch:
-        histoire_debut=np.array([
-        b[0],
-        b[1],
-        b[2],
-        b[3]])
-        histoire_noise_debut=add_noise(histoire_debut)
-        histoire_embedding_debut=infersent(histoire_debut)
-        histoire_embedding_noise_debut =infersent(histoire_noise_debut)
-        noise_debut=histoire_embedding_noise_debut-histoire_embedding_debut
-        histoire_fin = np.array([
-            b[4]])
-        histoire_noise_fin = add_noise(histoire_fin)
-        histoire_embedding_fin = infersent(histoire_fin)
-        histoire_embedding_noise_fin = infersent(histoire_noise_fin)
-        noise_fin = histoire_embedding_noise_fin - histoire_embedding_fin
-        all_histoire_debut_embedding.append(histoire_embedding_debut)
-        all_histoire_fin_embedding.append(histoire_embedding_fin)
-        all_histoire_noise_debut.append(histoire_embedding_noise_debut)
-        all_histoire_noise_fin.append(histoire_embedding_noise_fin)
-        all_noise_debut.append(noise_debut)
-        all_noise_fin.append(noise_fin)
-    return [np.array(all_histoire_debut_embedding), np.array(all_histoire_fin_embedding), np.array(all_histoire_noise_debut), np.array(all_histoire_noise_fin),
-            np.array(all_noise_debut),np.array(all_noise_fin)]
+    def __call__(self, data):
+        batch = np.array(data.batch)
+        all_histoire_debut_embedding = []
+        all_histoire_fin_embedding = []
+        all_histoire_noise_debut = []
+        all_histoire_noise_fin = []
+        all_noise_debut=[]
+        all_noise_fin=[]
+        for b in batch:
+            histoire_debut=np.array([
+            b[0],
+            b[1],
+            b[2],
+            b[3]])
+            histoire_noise_debut=self.add_noise(histoire_debut)
+            histoire_embedding_debut=self.infersent(histoire_debut)
+            histoire_embedding_noise_debut =self.infersent(histoire_noise_debut)
+            noise_debut=histoire_embedding_noise_debut-histoire_embedding_debut
+            histoire_fin = np.array([
+                b[4]])
+            histoire_noise_fin = self.add_noise(histoire_fin)
+            histoire_embedding_fin = self.infersent(histoire_fin)
+            histoire_embedding_noise_fin = self.infersent(histoire_noise_fin)
+            noise_fin = histoire_embedding_noise_fin - histoire_embedding_fin
+            all_histoire_debut_embedding.append(histoire_embedding_debut)
+            all_histoire_fin_embedding.append(histoire_embedding_fin)
+            all_histoire_noise_debut.append(histoire_embedding_noise_debut)
+            all_histoire_noise_fin.append(histoire_embedding_noise_fin)
+            all_noise_debut.append(noise_debut)
+            all_noise_fin.append(noise_fin)
+        return [np.array(all_histoire_debut_embedding), np.array(all_histoire_fin_embedding), np.array(all_histoire_noise_debut), np.array(all_histoire_noise_fin),
+                np.array(all_noise_debut),np.array(all_noise_fin)]
 
-def infersent(story):
-    """
-    :param story:
-    :return:
-    """
-    sentences=[]
-    for num,sto in enumerate(story):
-        sto=' '.join(sto)
-        sentences.append(sto)
-        embeddings = model.encode(sentences, tokenize=True, verbose=True)
-    return(embeddings)
+    def infersent(self,story):
+        """
+        :param story:
+        :return:
+        """
+        sentences=[]
+        for num,sto in enumerate(story):
+            sto=' '.join(sto)
+            sentences.append(sto)
+            embeddings = self.model.encode(sentences, tokenize=True, verbose=True)
+        return(embeddings)
 
-def output_fn_test(data):
-    """
-    :param data:
-    :return:
-    """
-    batch = np.array(data.batch)
-    all_histoire_debut_embedding = []
-    all_histoire_fin_embedding1 = []
-    all_histoire_fin_embedding2=[]
-    label=[]
-    for b in batch:
-        histoire_debut=np.array([
-        b[0],
-        b[1],
-        b[2],
-        b[3]])
-        histoire_embedding_debut=infersent(histoire_debut)
-        all_histoire_debut_embedding.append(histoire_embedding_debut)
-        histoire_fin1 = np.array([
-            b[4]])
-        histoire_fin2 = np.array([
-            b[5]])
-        histoire_embedding_fin1 = infersent(histoire_fin1)
-        all_histoire_fin_embedding1.append(histoire_embedding_fin1)
-        histoire_embedding_fin2 = infersent(histoire_fin2)
-        all_histoire_fin_embedding2.append(histoire_embedding_fin2)
-        label.append(2 - int(b[6][0]))
-    return [np.array(all_histoire_debut_embedding), np.array(all_histoire_fin_embedding1), np.array(all_histoire_fin_embedding2), np.array(label)]
+    def output_fn_test(self, data):
+        """
+        :param data:
+        :return:
+        """
+        batch = np.array(data.batch)
+        all_histoire_debut_embedding = []
+        all_histoire_fin_embedding1 = []
+        all_histoire_fin_embedding2=[]
+        label=[]
+        for b in batch:
+            histoire_debut=np.array([
+            b[0],
+            b[1],
+            b[2],
+            b[3]])
+            histoire_embedding_debut=self.infersent(histoire_debut)
+            all_histoire_debut_embedding.append(histoire_embedding_debut)
+            histoire_fin1 = np.array([
+                b[4]])
+            histoire_fin2 = np.array([
+                b[5]])
+            histoire_embedding_fin1 = self.infersent(histoire_fin1)
+            all_histoire_fin_embedding1.append(histoire_embedding_fin1)
+            histoire_embedding_fin2 = self.infersent(histoire_fin2)
+            all_histoire_fin_embedding2.append(histoire_embedding_fin2)
+            label.append(2 - int(b[6][0]))
+        return [np.array(all_histoire_debut_embedding), np.array(all_histoire_fin_embedding1), np.array(all_histoire_fin_embedding2), np.array(label)]
 
-def add_noise(variable, drop_probability: float = 0.1, shuffle_max_distance: int = 3):
-    """
-    :param variable:np array that : [[sentence1][sentence2]]
-    :param drop_probability: we drop every word in the input sentence with a probability
-    :param shuffle_max_distance: we slightly shuffle the input sentence
-    :return:
-    """
-    def perm(i):
-        return i[0] + (shuffle_max_distance + 1) * np.random.random()
-    liste=[]
-    for b in range(variable.shape[0]):
-        sequence = variable[b]
-        if (type(sequence)!=list):
-            sequence=sequence.tolist()
-        sequence, reminder = sequence[:-1], sequence[-1:]
-        if len(sequence) != 0:
-            compteur=0
-            for num,val in enumerate(np.random.random_sample(len(sequence))):
-                if val<drop_probability:
-                    sequence.pop(num-compteur)
-                    compteur = compteur + 1
-            sequence = [x for _, x in sorted(enumerate(sequence), key=perm)]
-        sequence = np.concatenate((sequence, reminder), axis=0)
-        liste.append(sequence)
-    new_variable=np.array(liste)
-    return new_variable
+    def add_noise(self, variable, drop_probability: float = 0.1, shuffle_max_distance: int = 3):
+        """
+        :param variable:np array that : [[sentence1][sentence2]]
+        :param drop_probability: we drop every word in the input sentence with a probability
+        :param shuffle_max_distance: we slightly shuffle the input sentence
+        :return:
+        """
+        def perm(i):
+            return i[0] + (shuffle_max_distance + 1) * np.random.random()
+        liste=[]
+        for b in range(variable.shape[0]):
+            sequence = variable[b]
+            if (type(sequence)!=list):
+                sequence=sequence.tolist()
+            sequence, reminder = sequence[:-1], sequence[-1:]
+            if len(sequence) != 0:
+                compteur=0
+                for num,val in enumerate(np.random.random_sample(len(sequence))):
+                    if val<drop_probability:
+                        sequence.pop(num-compteur)
+                        compteur = compteur + 1
+                sequence = [x for _, x in sorted(enumerate(sequence), key=perm)]
+            sequence = np.concatenate((sequence, reminder), axis=0)
+            liste.append(sequence)
+        new_variable=np.array(liste)
+        return new_variable
 
 
