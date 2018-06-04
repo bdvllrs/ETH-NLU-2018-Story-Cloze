@@ -141,7 +141,7 @@ def generator_model():
     output = dense_layer_3(output)
 
     # Model
-    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral, labels], outputs=output)
+    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
     model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
                   metrics=['accuracy'])
     return model
