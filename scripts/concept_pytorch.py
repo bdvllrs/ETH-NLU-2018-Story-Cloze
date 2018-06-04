@@ -8,10 +8,9 @@ import torch
 import time
 from utils.Trainer import Seq2SeqTrainer
 USE_CUDA = torch.cuda.is_available()
-#import tensorflow as tf
-#timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/', graph)
-
+import tensorflow as tf
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/')
 class Script(DefaultScript):
     slug = 'concept_fb'
 
@@ -69,10 +68,10 @@ class Script(DefaultScript):
                             # plot_losses_train_adv.append(plot_loss_adv_avg)
                             plot_losses_train_auto.append(plot_loss_auto_avg)
                             plot_losses_train_cross.append(plot_loss_cross_avg)
-                            np.save('./build/main_loss', np.array(plot_losses_train))
+                            np.save('./builds/main_loss', np.array(plot_losses_train))
                             # np.save('./build/adv_loss', np.array(plot_losses_train_adv))
-                            np.save('./build/auto_loss', np.array(plot_losses_train_auto))
-                            np.save('./build/cross_loss', np.array(plot_losses_train_cross))
+                            np.save('./builds/auto_loss', np.array(plot_losses_train_auto))
+                            np.save('./builds/cross_loss', np.array(plot_losses_train_cross))
                             print_summary = '%s (%d %d%%) %.4f %.4f %.4f' % (
                                 Seq2SEq_main_model.time_since(start, (num + 1) / (90000 / 32)), (num + 1),
                                 (num + 1) / (90000 / 32) * 100,
@@ -121,16 +120,16 @@ class Script(DefaultScript):
                                     if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                                         plot_acc_avg = correct / total
                                         plot_accurracies_avg_val.append(plot_acc_avg)
-                                        np.save('./build/accuracy_val', np.array(plot_accurracies_avg_val))
+                                        np.save('./builds/accuracy_val', np.array(plot_accurracies_avg_val))
                                         if plot_acc_avg > max_acc:
                                             torch.save(Seq2SEq_main_model.encoder_source.state_dict(),
-                                                       './build/encoder_source_best.pth')
+                                                       './builds/encoder_source_best.pth')
                                             torch.save(Seq2SEq_main_model.encoder_target.state_dict(),
-                                                       './build/encoder_target_best.pth')
+                                                       './builds/encoder_target_best.pth')
                                             torch.save(Seq2SEq_main_model.decoder_source.state_dict(),
-                                                       './build/decoder_source_best.pth')
+                                                       './builds/decoder_source_best.pth')
                                             torch.save(Seq2SEq_main_model.decoder_target.state_dict(),
-                                                       './build/decoder_target_best.pth')
+                                                       './builds/decoder_target_best.pth')
                                             max_acc = plot_acc_avg
                                             print('SAVE MODEL FOR ACCURACY : ' + str(plot_acc_avg))
                                         correct = 0
@@ -172,7 +171,7 @@ class Script(DefaultScript):
                         if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                             plot_acc_avg = correct / total
                             plot_accurracies_avg.append(plot_acc_avg)
-                            np.save('accuracy_test', np.array(plot_accurracies_avg))
+                            np.save('./builds/accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
                 torch.save(Seq2SEq_main_model.encoder_source.state_dict(), './encoder_source_epoch' + str(epoch) + '.pth')
