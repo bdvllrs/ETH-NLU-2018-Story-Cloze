@@ -26,8 +26,8 @@ class Script(DefaultScript):
         test_set.load_vocab('./data/default.voc', self.config.vocab_size)
         test_set.set_output_fn(output_fn.output_fn_test)
         train_set.set_output_fn(output_fn)
-        generator_training = train_set.get_batch(self.config.batch_size, self.config.n_epochs)
-        generator_dev = test_set.get_batch(self.config.batch_size, self.config.n_epochs)
+        generator_training = train_set.get_batch(self.config.batch_size, 1)
+        generator_dev = test_set.get_batch(self.config.batch_size, 1)
         epoch = 0
         max_acc = 0
         plot_losses_train = []
@@ -52,15 +52,19 @@ class Script(DefaultScript):
             for phase in ['train', 'test']:
                 print(phase)
                 if phase == 'train':
-                    for num, batch in enumerate(generator_training):
-                        print('NUM BATCH')
-                        print(num)
+                    for num_1, batch in enumerate(generator_training):
                         main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin = Seq2SEq_main_model.train_all(
                             batch)
+
+                        accuracy_summary = tf.Summary()
+                        accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
+                        accuracy_summary.value.add(tag='train_loss_auto', simple_value=loss_auto_debut+loss_auto_fin)
+                        accuracy_summary.value.add(tag='train_loss_cross', simple_value=loss_cross_debut+loss_cross_fin)
+                        writer.add_summary(accuracy_summary, num_1)
                         plot_loss_total += main_loss_total
                         plot_loss_total_auto += loss_auto_debut + loss_auto_fin
                         plot_loss_total_cross += loss_cross_debut + loss_cross_fin
-                        if num % self.config.plot_every == self.config.plot_every - 1:
+                        if num_1 % self.config.plot_every == self.config.plot_every - 1:
                             plot_loss_avg = plot_loss_total / self.config.plot_every
                             plot_loss_auto_avg = plot_loss_total_auto / self.config.plot_every
                             plot_loss_cross_avg = plot_loss_total_cross / self.config.plot_every
@@ -68,13 +72,13 @@ class Script(DefaultScript):
                             # plot_losses_train_adv.append(plot_loss_adv_avg)
                             plot_losses_train_auto.append(plot_loss_auto_avg)
                             plot_losses_train_cross.append(plot_loss_cross_avg)
-                            np.save('./builds/main_loss', np.array(plot_losses_train))
-                            # np.save('./build/adv_loss', np.array(plot_losses_train_adv))
-                            np.save('./builds/auto_loss', np.array(plot_losses_train_auto))
-                            np.save('./builds/cross_loss', np.array(plot_losses_train_cross))
+                            #np.save('./builds/main_loss', np.array(plot_losses_train))
+                            #np.save('./builds/adv_loss', np.array(plot_losses_train_adv))
+                            #np.save('./builds/auto_loss', np.array(plot_losses_train_auto))
+                            #np.save('./builds/cross_loss', np.array(plot_losses_train_cross))
                             print_summary = '%s (%d %d%%) %.4f %.4f %.4f' % (
-                                Seq2SEq_main_model.time_since(start, (num + 1) / (90000 / 32)), (num + 1),
-                                (num + 1) / (90000 / 32) * 100,
+                                Seq2SEq_main_model.time_since(start, (num_1 + 1) / (90000 / 32)), (num_1 + 1),
+                                (num_1 + 1) / (90000 / 32) * 100,
                                 plot_loss_avg, plot_loss_auto_avg, plot_loss_cross_avg)
                             print(print_summary)
                             plot_loss_total = 0
@@ -88,7 +92,6 @@ class Script(DefaultScript):
                             total = 0
                             for num, batch in enumerate(generator_dev):
                                 if num < 21:
-
                                     all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).transpose(0, 1)
                                     all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1])).transpose(0, 1)
                                     all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2])).transpose(0, 1)
@@ -116,11 +119,14 @@ class Script(DefaultScript):
                                     preds = preds.cpu().long()
                                     correct += (preds == labels).sum().item()
                                     total += self.config.batch_size
-                                    print(correct / total)
+                                    accuracy_summary = tf.Summary()
+                                    accuracy_summary.value.add(tag='val_accuracy',
+                                                               simple_value=(correct / total))
+                                    writer.add_summary(accuracy_summary, num - 1)
                                     if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                                         plot_acc_avg = correct / total
                                         plot_accurracies_avg_val.append(plot_acc_avg)
-                                        np.save('./builds/accuracy_val', np.array(plot_accurracies_avg_val))
+                                        #np.save('./builds/accuracy_val', np.array(plot_accurracies_avg_val))
                                         if plot_acc_avg > max_acc:
                                             torch.save(Seq2SEq_main_model.encoder_source.state_dict(),
                                                        './builds/encoder_source_best.pth')
@@ -138,6 +144,7 @@ class Script(DefaultScript):
                                     print('done validation')
                                     break
                 else:
+                    print(phase)
                     correct = 0
                     total = 0
                     for num, batch in enumerate(generator_dev):
@@ -167,13 +174,18 @@ class Script(DefaultScript):
                         preds = preds.cpu().long()
                         correct += (preds == labels).sum().item()
                         total += self.config.batch_size
-                        print(correct / total)
+                        accuracy_summary = tf.Summary()
+                        accuracy_summary.value.add(tag='test_accuracy',
+                                                   simple_value=(correct / total))
+                        writer.add_summary(accuracy_summary, num - 1)
                         if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                             plot_acc_avg = correct / total
                             plot_accurracies_avg.append(plot_acc_avg)
-                            np.save('./builds/accuracy_test', np.array(plot_accurracies_avg))
+                            #np.save('./builds/accuracy_test', np.array(plot_accurracies_avg))
                             correct = 0
                             total = 0
+
+                print('SAVE MODEL END EPOCH')
                 torch.save(Seq2SEq_main_model.encoder_source.state_dict(), './builds/encoder_source_epoch' + str(epoch) + '.pth')
                 torch.save(Seq2SEq_main_model.encoder_target.state_dict(), './builds/encoder_target_epoch' + str(epoch) + '.pth')
                 torch.save(Seq2SEq_main_model.decoder_source.state_dict(), './builds/decoder_source_epoch' + str(epoch) + '.pth')
@@ -191,7 +203,6 @@ class Script(DefaultScript):
         :param all_histoire_fin_embedding2:
         :return:
         """
-
         semblable_fin1 = []
         semblable_fin2 = []
         semblable_debut1 = []
