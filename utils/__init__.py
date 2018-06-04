@@ -4,4 +4,5 @@ from .SentimentsSimple import SentimentsSimple
 from .Sentiments import Sentiments
 from .Dataloader import Dataloader, Data
 from .SNLIDataloader import SNLIDataloader
+from .SNLIDataloaderPairs import SNLIDataloaderPairs
 from .Discriminator import Discriminator
