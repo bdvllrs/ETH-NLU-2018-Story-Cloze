@@ -102,11 +102,9 @@ class OutputFN:
             # Sometimes from neutral to contradiction, else other way
             # 0 to go to contradiction, 1 otherwise
             if random.random() > 0.5:
-                labels.append(0)
                 input_sentences.append(b[0][1])
                 output_sentences.append(b[1][1])
             else:
-                labels.append(1)
                 input_sentences.append(b[0][1])
                 output_sentences.append(b[0][1])
         ref_sentences = np.array(ref_sentences, dtype=object)
@@ -116,8 +114,7 @@ class OutputFN:
             ref_sent = self.elmo_emb_model.predict(ref_sentences, batch_size=len(batch))
             input_sent = self.elmo_emb_model.predict(input_sentences, batch_size=len(batch))
             out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
-            labels = np.array(labels)
-        return [ref_sent, input_sent, labels], out_sent
+        return [ref_sent, input_sent], out_sent
 
 
 def get_elmo_embedding(elmo_fn):
@@ -135,9 +132,8 @@ def generator_model():
 
     sentence_ref = keras.layers.Input(shape=(1024,))
     sentence_neutral = keras.layers.Input(shape=(1024,))
-    labels = keras.layers.Input(shape=(1,))
 
-    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral, labels])
+    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
 
     # inputs = sentiments
     output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
