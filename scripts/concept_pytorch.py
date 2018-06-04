@@ -53,7 +53,6 @@ class Script(DefaultScript):
                 print(phase)
                 if phase == 'train':
                     for num_1, batch in enumerate(generator_training):
-                        print(num_1)
                         main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin = Seq2SEq_main_model.train_all(
                             batch)
 
@@ -139,7 +138,9 @@ class Script(DefaultScript):
                                         dcorrectfin += (predfin_dis == labels).sum().item()
                                         dcorrectdebut += (preddebut_dis == labels).sum().item()
 
+                                        print("Accuracy colinéaire somme, fin, debut")
                                         print(correct/ total,correctfin/ total,correctdebut/ total)
+                                        print("Accuracy distance somme, fin, debut")
                                         print(dcorrect/ total, dcorrectfin/ total, dcorrectdebut/ total)
 
                                         total += self.config.batch_size
@@ -177,7 +178,6 @@ class Script(DefaultScript):
                                             dcorrect = 0
                                             dcorrectfin = 0
                                             dcorrectdebut = 0
-
                                             total = 0
                                     else:
                                         print('done validation')
