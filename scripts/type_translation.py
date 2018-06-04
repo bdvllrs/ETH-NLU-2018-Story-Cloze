@@ -111,11 +111,11 @@ class OutputFN:
         ref_sentences = np.array(ref_sentences, dtype=object)
         input_sentences = np.array(input_sentences, dtype=object)
         output_sentences = np.array(output_sentences, dtype=object)
-        labels = np.array(labels)
         with self.graph.as_default():
             ref_sent = self.elmo_emb_model.predict(ref_sentences, batch_size=len(batch))
             input_sent = self.elmo_emb_model.predict(input_sentences, batch_size=len(batch))
             out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
+            labels = np.array(labels)
         return [ref_sent, input_sent, labels], out_sent
 
 
@@ -144,7 +144,7 @@ def generator_model():
     output = dense_layer_3(output)
 
     # Model
-    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral], outputs=output)
+    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral, labels], outputs=output)
     model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
                   metrics=['accuracy'])
     return model
