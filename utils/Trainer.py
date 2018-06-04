@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
-from utils.Discriminator import Discriminator
 from models.Seq2Seq import EncoderRNN, DecoderStep
 import numpy as np
 USE_CUDA = torch.cuda.is_available()
@@ -18,7 +17,7 @@ class Seq2SeqTrainer(nn.Module):
 
     def __init__(self, hidden_size, embed_size, n_layers,batch_size,
                  attention_bolean, dropout=0.5, learning_rate=0.0003,
-                 plot_every=20, print_every=100, evaluate_every=1000, max_length=100,learning_rate_discriminator=0.0005):
+                 plot_every=20, print_every=100, evaluate_every=1000):
         super(Seq2SeqTrainer, self).__init__()
         """
         :param input_size:
@@ -49,7 +48,6 @@ class Seq2SeqTrainer(nn.Module):
         self.evaluate_every = evaluate_every
         # config type model
         self.attention_bolean = attention_bolean
-        self.learning_rate_discriminator=learning_rate_discriminator
         self.input_length_debut = Variable(torch.from_numpy(np.array([4] * self.batch_size, dtype=np.int32)).long()).cuda()
         self.input_length_fin = Variable(torch.LongTensor(np.array([1] * self.batch_size, dtype=np.int32)).long()).cuda()
         # Initialize models
@@ -62,21 +60,18 @@ class Seq2SeqTrainer(nn.Module):
 
         self.decoder_source.attn_encoder=self.decoder_target.attn_encoder
 
-        self.discriminator = Discriminator(max_length, hidden_size, hidden_size, n_layers)
         self.encoder_optimizer_source = optim.Adam(self.encoder_source.parameters(), lr=self.learning_rate)
         self.decoder_optimizer_source = optim.Adam(self.decoder_source.parameters(),
                                               lr=self.learning_rate)
         self.encoder_optimizer_target = optim.Adam(self.encoder_target.parameters(), lr=self.learning_rate)
         self.decoder_optimizer_target = optim.Adam(self.decoder_target.parameters(),
                                               lr=self.learning_rate)
-        self.discriminator_optmizer=optim.RMSprop(self.discriminator.parameters(), lr=self.learning_rate_discriminator)
         # Move models to GPU
         if USE_CUDA:
             self.encoder_source.cuda()
             self.decoder_source.cuda()
             self.encoder_target.cuda()
             self.decoder_target.cuda()
-            self.discriminator.cuda()
 
     def as_minutes(self,s):
         m = math.floor(s / 60)
@@ -96,7 +91,7 @@ class Seq2SeqTrainer(nn.Module):
 
 
     def train_step(self, encoder, decoder, input_batches, input_lengths, target_batches, target_lengths, encoder_optimizer,
-                   decoder_optimizer, discriminator_optmizer, criterion_adver, target_adver):
+                   decoder_optimizer):
         """
         :param encoder:
         :param decoder:
@@ -114,15 +109,11 @@ class Seq2SeqTrainer(nn.Module):
         # Zero gradients of both optimizers
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
-        discriminator_optmizer.zero_grad()
         encoder.train(True)
         decoder.train(True)
         # Run words through encoder
         encoder_outputs, encoder_hidden = encoder(input_batches, input_lengths, None)
         #Discriminator action
-        log_prob = self.discriminator.forward(encoder_outputs)
-        log_prob = log_prob.view(-1)
-        adv_loss = criterion_adver(log_prob, target_adver)
         # Prepare input and output variables
         decoder_input = Variable(torch.LongTensor([[0] * self.batch_size]*self.embed_size))
         decoder_hidden = encoder_hidden[:self.n_layers]  # Use last (forward) hidden state from encoder
@@ -139,17 +130,22 @@ class Seq2SeqTrainer(nn.Module):
             all_decoder_outputs[t] = decoder_output
             decoder_input = target_batches[t].transpose(0,1)  # Next input is current target
         # Loss calculation and backpropagation
-        total_loss =1- torch.cos(all_decoder_outputs.float()-target_batches.float())
-        total_loss=total_loss.sum(2)/self.embed_size
-        total_loss = total_loss.sum(0) / max_target_length
-        total_loss = total_loss.sum(0) / self.batch_size
+        all_decoder_outputs=all_decoder_outputs.float().transpose(0,1)
+        target_batches=target_batches.float().transpose(0,1)
+        for num_batch, batch in enumerate(all_decoder_outputs):
+            for num_sent, sent in enumerate(batch):
+                produit=torch.dot(sent,target_batches[num_batch][num_sent])/ (torch.norm(sent) * torch.norm(target_batches[num_batch][num_sent]))
+                if num_sent==0:
+                    total_loss=1-produit
+                else:
+                    total_loss += 1-produit
         total_loss.backward(retain_graph=True)
-        adv_loss.backward()
+
         # Update parameters with optimizers
         encoder_optimizer.step()
         decoder_optimizer.step()
-        discriminator_optmizer.step()
-        return total_loss.item(),adv_loss.item()
+
+        return total_loss.item()
 
 
     def evaluate(self,encoder,decoder, batch_input, input_lengths):
@@ -190,7 +186,7 @@ class Seq2SeqTrainer(nn.Module):
         return all_decoder_outputs.transpose(0, 1).contiguous()
 
 
-    def train_auto_encoder(self, input, noise_input,input_lengths,target_lengths,start,encoder_optimizer_source,decoder_optimizer_source,discriminator_optmizer, criterion_adver,encoder, decoder):
+    def train_auto_encoder(self, input, noise_input,input_lengths,target_lengths,encoder_optimizer_source,decoder_optimizer_source,encoder, decoder):
         """
         :param encoder:
         :param decoder:
@@ -200,24 +196,18 @@ class Seq2SeqTrainer(nn.Module):
         :param output_length:
         :return:
         """
-        if start:
-            target_adver = Variable(torch.zeros(self.batch_size)).cuda()  # B
-        else:
-            target_adver = Variable(torch.ones(self.batch_size)).cuda()  # B
-        noise_input = Variable(torch.LongTensor(noise_input)).cuda()
-        input = Variable(torch.LongTensor(input)).cuda()
-        loss_start1, adv_loss_start1= self.train_step(encoder, decoder, noise_input.transpose(0,1),input_lengths,
+
+        noise_input = Variable(torch.FloatTensor(noise_input)).cuda()
+        input = Variable(torch.FloatTensor(input)).cuda()
+        loss_start1= self.train_step(encoder, decoder, noise_input.transpose(0,1),input_lengths,
                                                                                                input.transpose(0, 1),
                                                                                                target_lengths,
                                                                                                encoder_optimizer_source,
-                                                                                               decoder_optimizer_source,
-                                                                                               discriminator_optmizer,
-                                                                                               criterion_adver,
-                                                                                               target_adver)
-        return(loss_start1, adv_loss_start1 )
+                                                                                               decoder_optimizer_source)
+        return(loss_start1)
 
-    def train_cross(self, input,input_length, output_length,noise, start, encoder_optimizer_source, decoder_optimizer_source,
-                           discriminator_optmizer, criterion_adver, encoder, decoder):
+    def train_cross(self, input,input_length, output_length,noise, encoder_optimizer_source, decoder_optimizer_source,
+                           encoder, decoder):
         """
         :param input:
         :param output:
@@ -229,23 +219,17 @@ class Seq2SeqTrainer(nn.Module):
         :param criterion_adver:
         :return:
         """
-        if start:
-            target_adver = Variable(torch.zeros(self.batch_size)).cuda()  # B
-        else:
-            target_adver = Variable(torch.ones(self.batch_size)).cuda()  # B
-        input = Variable(torch.LongTensor(input)).transpose(0,1).cuda()
+        input = Variable(torch.FloatTensor(input)).transpose(0,1).cuda()
         out = self.evaluate(self.encoder_source, self.decoder_target, input,
                                   input_length)
-        noise = Variable(torch.LongTensor(noise)).cuda()
+        noise = Variable(torch.FloatTensor(noise)).cuda()
         noise_input = noise.float()+out.detach().float()
-        loss_start1, adv_loss_start1 = self.train_step(encoder, decoder,noise_input.transpose(0,1),output_length,input,
+        loss_start1 = self.train_step(encoder, decoder,noise_input.transpose(0,1),output_length,input,
                                                                                                input_length,
                                                                                                encoder_optimizer_source,
                                                                                                decoder_optimizer_source,
-                                                                                               discriminator_optmizer,
-                                                                                               criterion_adver,
-                                                                                               target_adver)
-        return (loss_start1, adv_loss_start1)
+                                                                                               )
+        return (loss_start1)
 
 
 
@@ -258,9 +242,7 @@ class Seq2SeqTrainer(nn.Module):
         decoder_optimizer_source = self.decoder_optimizer_source
         encoder_optimizer_target = self.encoder_optimizer_target
         decoder_optimizer_target = self.decoder_optimizer_target
-        discriminator_optmizer=self.discriminator_optmizer
         all_batch=input_all
-        criterion_adver = nn.BCELoss() #ou BCELoss ? et =criterion ?
         # Keep track of time elapsed and running averages
         input_length_debut = self.input_length_debut
         input_length_fin = self.input_length_fin
@@ -277,23 +259,20 @@ class Seq2SeqTrainer(nn.Module):
         all_debut_noise = all_batch[4]
         all_fin_noise = all_batch[5]
         #Start to start
-        loss_auto_debut, adv_loss_auto_debut=self.train_auto_encoder(all_histoire_debut_embedding, all_histoire_debut_noise, input_length_debut, input_length_debut, True, encoder_optimizer_source,
-                                                                                                                                                          decoder_optimizer_source, discriminator_optmizer, criterion_adver, self.encoder_source, self.decoder_source)
+        loss_auto_debut=self.train_auto_encoder(all_histoire_debut_embedding, all_histoire_debut_noise, input_length_debut, input_length_debut, encoder_optimizer_source,
+                                                                                                                                                          decoder_optimizer_source, self.encoder_source, self.decoder_source)
         # end to end
-        loss_auto_fin, adv_loss_auto_fin = self.train_auto_encoder(all_histoire_fin_embedding, all_histoire_fin_noise, input_length_fin, input_length_fin, False, encoder_optimizer_target,
-                                                                                                                                             decoder_optimizer_target, discriminator_optmizer, criterion_adver, self.encoder_target, self.decoder_target)
+        loss_auto_fin = self.train_auto_encoder(all_histoire_fin_embedding, all_histoire_fin_noise, input_length_fin, input_length_fin, encoder_optimizer_target,
+                                                                                                                                             decoder_optimizer_target,  self.encoder_target, self.decoder_target)
         #Start->End->Start
-        loss_cross_debut, adv_cross_auto_debut=self.train_cross(all_histoire_debut_embedding, input_length_debut, input_length_fin, all_fin_noise, False,
-                                                                                                   encoder_optimizer_source, decoder_optimizer_target,
-                                                                                                   discriminator_optmizer, criterion_adver, self.encoder_source, self.decoder_target)
+        loss_cross_debut=self.train_cross(all_histoire_debut_embedding, input_length_debut, input_length_fin, all_fin_noise, encoder_optimizer_source, decoder_optimizer_target,
+                                                                                                   self.encoder_source, self.decoder_target)
         # End->Start->End
-        loss_cross_fin, adv_cross_auto_fin= self.train_cross(
+        loss_cross_fin= self.train_cross(
             all_histoire_fin_embedding, input_length_fin, input_length_debut,
-            all_debut_noise, True,
-            encoder_optimizer_target, decoder_optimizer_source,
-            discriminator_optmizer, criterion_adver, self.encoder_target, self.decoder_source)
+            all_debut_noise, encoder_optimizer_target, decoder_optimizer_source,
+            self.encoder_target, self.decoder_source)
         #compteurs
         main_loss_total = loss_auto_debut+loss_auto_fin+loss_cross_debut+loss_cross_fin
-        discriminator_loss_total = adv_cross_auto_debut+adv_cross_auto_fin+adv_loss_auto_debut+adv_loss_auto_fin
-        return (main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin, discriminator_loss_total)
+        return (main_loss_total, loss_auto_debut, loss_auto_fin, loss_cross_debut, loss_cross_fin)
 
