@@ -18,12 +18,12 @@ import keras.backend as K
 import numpy as np
 from keras.layers import BatchNormalization, Dropout, LeakyReLU
 
-from utils import SNLIDataloaderPairs
+from utils import SNLIDataloaderPairs, Dataloader
 from scripts import DefaultScript
 
 
 class Script(DefaultScript):
-    slug = 'type_translation'
+    slug = 'type_translation_test'
 
     def train(self):
         main(self.config)
@@ -87,7 +87,7 @@ def preprocess_fn(line):
     return output
 
 
-class OutputFN:
+class OutputFNTest:
     def __init__(self, elmo_emb_model, graph):
         self.graph = graph
         self.elmo_emb_model = elmo_emb_model
@@ -120,34 +120,46 @@ class OutputFN:
         return [ref_sent, input_sent, labels], out_sent
 
 
+class OutputFN:
+    def __init__(self, elmo_emb_model, graph):
+        self.graph = graph
+        self.elmo_emb_model = elmo_emb_model
+
+    def __call__(self, data):
+        batch = np.array(data.batch)
+        ref_sentences = []
+        input_sentences = []
+        output_sentences = []
+        label = []
+        for b in batch:
+            sentence = " ".join(b[0]) + " "
+            sentence += " ".join(b[1]) + " "
+            sentence += " ".join(b[2]) + " "
+            sentence += " ".join(b[3]) + " "
+            if int(b[6][0]) == 1:
+                input_sentences.append(" ".join(b[4]))
+                output_sentences.append(" ".join(b[5]))
+                label.append(0)
+            else:
+                input_sentences.append(" ".join(b[4]))
+                output_sentences.append(" ".join(b[4]))
+                label.append(1)
+            ref_sentences.append(sentence)
+        ref_sentences, input_sentences = np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)
+        output_sentences = np.array(input_sentences, dtype=object)
+        with self.graph.as_default():
+            # Get the elmo embeddings for the input sentences and ref sentences (stories)
+            input_sentences_emb = self.elmo_emb_model.predict(input_sentences, batch_size=len(batch))
+            ref_sentences_emb = self.elmo_emb_model.predict(ref_sentences, batch_size=len(batch))
+            output_sentences_emb = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
+        return [ref_sentences_emb, input_sentences_emb, np.array(label)], output_sentences_emb
+
+
 def get_elmo_embedding(elmo_fn):
     elmo_embeddings = keras.layers.Lambda(elmo_fn, output_shape=(1024,))
     sentence = keras.layers.Input(shape=(1,), dtype="string")
     sentence_emb = elmo_embeddings(sentence)
     model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
-    return model
-
-
-def generator_model():
-    dense_layer_1 = keras.layers.Dense(4096)
-    dense_layer_2 = keras.layers.Dense(2048)
-    dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
-
-    sentence_ref = keras.layers.Input(shape=(1024,))
-    sentence_neutral = keras.layers.Input(shape=(1024,))
-    labels = keras.layers.Input(shape=(1,))
-
-    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral, labels])
-
-    # inputs = sentiments
-    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
-    output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_2(output))))
-    output = dense_layer_3(output)
-
-    # Model
-    model = keras.models.Model(inputs=[sentence_ref, sentence_neutral, labels], outputs=output)
-    model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="mean_squared_error",
-                  metrics=['accuracy'])
     return model
 
 
@@ -175,21 +187,26 @@ def main(config):
     elmo_model_emb = get_elmo_embedding(elmo_emb_fn)
 
     output_fn = OutputFN(elmo_model_emb, graph)
+    output_fn_test = OutputFNTest(elmo_model_emb, graph)
 
-    train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
-    train_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
-    train_set.set_preprocess_fn(preprocess_fn)
+    train_set = Dataloader(config, 'data/test_stories.csv', testing_data=True)
+    # train_set.set_preprocess_fn(preprocess_fn)
+    train_set.load_dataset('data/test.bin')
+    train_set.load_vocab('./data/default.voc', config.vocab_size)
     train_set.set_output_fn(output_fn)
     dev_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_dev.jsonl')
     dev_set.load_vocab('./data/snli_vocab.dat', config.vocab_size)
     dev_set.set_preprocess_fn(preprocess_fn)
-    dev_set.set_output_fn(output_fn)
+    dev_set.set_output_fn(output_fn_test)
     # test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
 
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
     generator_dev = dev_set.get_batch(config.batch_size, config.n_epochs)
 
-    keras_model = generator_model()
+    keras_model = keras.models.load_model(
+            config.type_translation_model, {
+                'elmo_embeddings': elmo_emb_fn
+            })
 
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -206,9 +223,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=len(train_set)/config.batch_size,
+    keras_model.fit_generator(generator_training, steps_per_epoch=5,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
-                              validation_steps=len(dev_set)/config.batch_size,
+                              validation_steps=5,
                               callbacks=[tensorboard, saver])

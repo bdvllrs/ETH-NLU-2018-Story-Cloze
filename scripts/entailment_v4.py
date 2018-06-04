@@ -54,9 +54,13 @@ class OutputFN:
             # Get the elmo embeddings for the input sentences and ref sentences (stories)
             input_sentences_emb = self.elmo_model.predict(input_sentences, batch_size=len(batch))
             ref_sentences_emb = self.elmo_model.predict(ref_sentences, batch_size=len(batch))
+            neutral_sentence_emb = self.type_translation_model.predict(
+                    [ref_sentences_emb, input_sentences_emb, np.ones(len(batch))],
+                    batch_size=len(batch))
             # Get the prediction of the negative sentence by our type transfert model
-            negative_sentence_emb = self.type_translation_model.predict([ref_sentences_emb, input_sentences_emb],
-                                                                        batch_size=len(batch))
+            negative_sentence_emb = self.type_translation_model.predict(
+                    [ref_sentences_emb, input_sentences_emb, np.zeros(len(batch))],
+                    batch_size=len(batch))
         labels = []
         output_sentences = []
         for b in range(len(batch)):
@@ -65,7 +69,7 @@ class OutputFN:
                 output_sentences.append(negative_sentence_emb[b])
                 labels.append(0)
             else:
-                output_sentences.append(input_sentences_emb[b])
+                output_sentences.append(neutral_sentence_emb[b])
                 labels.append(1)
         return [ref_sentences_emb, np.array(output_sentences)], np.array(labels)
 
@@ -132,7 +136,8 @@ def model():
 
     # Model
     entailment_model = keras.models.Model(inputs=[sentence1, sentence2], outputs=output)
-    entailment_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
+    entailment_model.compile(optimizer=keras.optimizers.Adam(lr=0.0002, decay=8e-9), loss="binary_crossentropy",
+                             metrics=['accuracy'])
     return entailment_model
 
 
@@ -200,9 +205,9 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=100,
+    keras_model.fit_generator(generator_training, steps_per_epoch=5,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_test,
-                              validation_steps=len(test_set) / config.batch_size,
+                              validation_steps=5,
                               callbacks=[tensorboard, saver])
