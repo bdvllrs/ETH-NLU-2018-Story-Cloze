@@ -8,9 +8,9 @@ import torch
 import time
 from utils.Trainer import Seq2SeqTrainer
 USE_CUDA = torch.cuda.is_available()
-import tensorflow as tf
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/', graph)
+#import tensorflow as tf
+#timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/', graph)
 
 class Script(DefaultScript):
     slug = 'concept_fb'
