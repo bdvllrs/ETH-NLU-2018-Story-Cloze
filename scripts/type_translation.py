@@ -96,27 +96,27 @@ class OutputFN:
         ref_sentences = []
         input_sentences = []
         output_sentences = []
+        labels = []
         for b in batch:
             ref_sentences.append(b[0][0])
             # Sometimes from neutral to contradiction, else other way
             if random.random() > 0.5:
-                inp_sent = b[0][1]
-                inp_sent.append(0)
-                input_sentences.append(inp_sent)
+                labels.append(0)
+                input_sentences.append(b[0][1])
                 output_sentences.append(b[1][1])
             else:
-                inp_sent = b[0][1]
-                inp_sent.append(1)
-                input_sentences.append(inp_sent)
+                labels.append(1)
+                input_sentences.append(b[0][1])
                 output_sentences.append(b[0][1])
         ref_sentences = np.array(ref_sentences, dtype=object)
         input_sentences = np.array(input_sentences, dtype=object)
         output_sentences = np.array(output_sentences, dtype=object)
+        labels = np.array(labels)
         with self.graph.as_default():
             ref_sent = self.elmo_emb_model.predict(ref_sentences, batch_size=len(batch))
             input_sent = self.elmo_emb_model.predict(input_sentences, batch_size=len(batch))
             out_sent = self.elmo_emb_model.predict(output_sentences, batch_size=len(batch))
-        return [ref_sent, input_sent], out_sent
+        return [ref_sent, input_sent, labels], out_sent
 
 
 def get_elmo_embedding(elmo_fn):
@@ -133,9 +133,10 @@ def generator_model():
     dense_layer_3 = keras.layers.Dense(1024, activation='tanh')
 
     sentence_ref = keras.layers.Input(shape=(1024,))
-    sentence_neutral = keras.layers.Input(shape=(1024 + 1,))
+    sentence_neutral = keras.layers.Input(shape=(1024,))
+    labels = keras.layers.Input(shape=(1,))
 
-    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral])
+    sentence = keras.layers.concatenate([sentence_ref, sentence_neutral, labels])
 
     # inputs = sentiments
     output = BatchNormalization(momentum=0.8)(Dropout(0.4)(LeakyReLU(alpha=0.2)(dense_layer_1(sentence))))
