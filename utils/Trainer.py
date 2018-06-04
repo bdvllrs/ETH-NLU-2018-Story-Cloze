@@ -135,14 +135,16 @@ class Seq2SeqTrainer(nn.Module):
         # Loss calculation and backpropagation
         all_decoder_outputs=all_decoder_outputs.float().transpose(0,1)
         target_batches=target_batches.float().transpose(0,1)
-        for num_batch, batch in enumerate(all_decoder_outputs):
-            for num_sent, sent in enumerate(batch):
-                produit=torch.dot(sent,target_batches[num_batch][num_sent])/ (torch.norm(sent) * torch.norm(target_batches[num_batch][num_sent]))
-                if num_sent==0:
-                    total_loss=1-produit
-                else:
-                    total_loss += 1-produit
-        total_loss.backward(retain_graph=True)
+
+        #for num_batch, batch in enumerate(all_decoder_outputs):
+        #    for num_sent, sent in enumerate(batch):
+        #        produit=torch.dot(sent,target_batches[num_batch][num_sent])/ (torch.norm(sent) * torch.norm(target_batches[num_batch][num_sent]))
+        #        if num_sent==0:
+        #            total_loss=1-produit
+        #        else:
+        #            total_loss += 1-produit
+        total_loss=torch.norm(all_decoder_outputs-target_batches)
+        total_loss.backward()
 
         # Update parameters with optimizers
         encoder_optimizer.step()
@@ -234,7 +236,8 @@ class Seq2SeqTrainer(nn.Module):
         noise = Variable(torch.FloatTensor(noise))
         if USE_CUDA:
             noise=noise.cuda()
-        noise_input = noise.float()+out.detach().float()
+        #noise_input = noise.float()+out.detach().float()
+        noise_input = out.detach().float()
         loss_start1 = self.train_step(encoder, decoder,noise_input.transpose(0,1),output_length,input,
                                                                                                input_length,
                                                                                                encoder_optimizer_source,
