@@ -87,6 +87,16 @@ class Script(DefaultScript):
                             validation_steps=len(test_set) / self.config.batch_size,
                             callbacks=[tensorboard, saver])
 
+        if self.config.algnment.is_set('save_encoder_decoder') and self.config.alignment.save_model:
+            model_path = os.path.abspath(
+                    os.path.join(os.curdir, './builds/' + timestamp))
+            model_path += '-alignment_'
+
+            self.decoder_target_model.save(model_path + 'decoder_target.hdf5')
+            self.decoder_src_model.save(model_path + 'decoder_src.hdf5')
+            self.encoder_target_model.save(model_path + 'encoder_target.hdf5')
+            self.encoder_src_model.save(model_path + 'encoder_src.hdf5')
+
     def build_graph(self):
         input_src = Input((1024,))  # src sentence (only last sentence of story)
         input_src_noise = Input((1024,))  # Noise on src sentence
