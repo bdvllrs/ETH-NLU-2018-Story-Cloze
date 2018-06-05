@@ -59,7 +59,6 @@ class Script(DefaultScript):
             print("Epoch:", epoch)
             epoch += 1
             for num_1, batch in enumerate(generator_training):
-                print(num_1)
                 all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0])).cuda()
                 all_histoire_fin_embedding = Variable(torch.FloatTensor(batch[1])).cuda()
                 all_histoire_debut_noise =Variable(torch.FloatTensor(batch[2])).cuda()
@@ -76,24 +75,22 @@ class Script(DefaultScript):
                 decoder_tgt.train(True)
                 discriminator.train(True)
                 #autoencoder
-                print("autoencoder")
                 #1
                 z_src_autoencoder=encoder_src(all_histoire_debut_noise)
                 pred_discriminator_src=discriminator.forward(z_src_autoencoder)
                 pred_discriminator_src = pred_discriminator_src.view(-1)
                 adv_loss1 = criterion_adver(pred_discriminator_src, target_adver_src)
                 out_src_auto = decoder_src(z_src_autoencoder)
-                loss1=torch.nn.functional.cosine_embedding_loss(out_src_auto.transpose(0,2),all_histoire_debut_noise.transpose(0,2),target_adver_tgt)
+                loss1=torch.nn.functional.cosine_embedding_loss(out_src_auto.transpose(0,2).transpose(0,1),all_histoire_debut_noise.transpose(0,2).transpose(0,1),target_adver_tgt)
                 #2
                 z_tgt_autoencoder = encoder_tgt(all_histoire_fin_noise)
                 pred_discriminator_tgt = discriminator.forward(z_tgt_autoencoder)
                 pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
                 adv_loss2 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
                 out_tgt_auto = decoder_tgt(z_tgt_autoencoder)
-                loss2 = torch.nn.functional.cosine_embedding_loss(out_tgt_auto.transpose(0, 2),
-                                                                  all_histoire_fin_embedding.transpose(0, 2),
+                loss2 = torch.nn.functional.cosine_embedding_loss(out_tgt_auto.transpose(0, 2).transpose(0,1),
+                                                                  all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
                                                                   target_adver_tgt)
-                print("crossentropy")
                 if epoch == 1:
                     y_src_eval= all_histoire_debut_noise
                     y_tgt_eval = all_histoire_fin_noise
@@ -114,8 +111,8 @@ class Script(DefaultScript):
                 pred_discriminator_src = discriminator.forward(z_src_cross)
                 pred_discriminator_src = pred_discriminator_src.view(-1)
                 adv_loss3 = criterion_adver(pred_discriminator_src, target_adver_src)
-                loss3 = torch.nn.functional.cosine_embedding_loss(pred_fin.transpose(0, 2),
-                                                                  all_histoire_fin_embedding.transpose(0, 2),
+                loss3 = torch.nn.functional.cosine_embedding_loss(pred_fin.transpose(0, 2).transpose(0,1),
+                                                                  all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
                                                                   target_adver_tgt)
                 # evaluate2
                 z_tgt_cross = encoder_tgt(y_tgt_eval)
@@ -123,8 +120,8 @@ class Script(DefaultScript):
                 pred_discriminator_tgt = discriminator.forward(z_tgt_cross)
                 pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
                 adv_loss4 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
-                loss4 = torch.nn.functional.cosine_embedding_loss(pred_debut.transpose(0, 2),
-                                                                  all_histoire_debut_embedding.transpose(0, 2),
+                loss4 = torch.nn.functional.cosine_embedding_loss(pred_debut.transpose(0, 2).transpose(0,1),
+                                                                  all_histoire_debut_embedding.transpose(0, 2).transpose(0,1),
                                                                   target_adver_tgt)
                 total_loss=loss1+loss2+loss3+loss4+adv_loss1+adv_loss2+adv_loss3+adv_loss4
                 #upgrade
@@ -135,39 +132,31 @@ class Script(DefaultScript):
                 decoder_optimizer_target.step()
                 discriminator_optmizer.step()
                 accuracy_summary = tf.Summary()
-
                 main_loss_total=total_loss.item()
                 accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
                 writer.add_summary(accuracy_summary, num_1)
                 plot_loss_total += main_loss_total
                 if num_1 % self.config.plot_every == self.config.plot_every - 1:
                     plot_loss_avg = plot_loss_total / self.config.plot_every
-                    plot_loss_auto_avg = plot_loss_total_auto / self.config.plot_every
-                    plot_loss_cross_avg = plot_loss_total_cross / self.config.plot_every
-                    print_summary = '%s (%d %d%%) %.4f %.4f %.4f' % (
+                    print_summary = '%s (%d %d%%) %.4f' % (
                     self.time_since(start, (num_1 + 1) / (90000 / 32)), (num_1 + 1),
                         (num_1 + 1) / (90000 / 32) * 100,
-                        plot_loss_avg, plot_loss_auto_avg, plot_loss_cross_avg)
+                        plot_loss_avg)
                     print(print_summary)
                     plot_loss_total = 0
-                    plot_loss_total_auto = 0
-                    plot_loss_total_cross = 0
                     compteur_val += 1
-                    if compteur_val == 1:
+                    if compteur_val == 3:
                         compteur_val = 0
                         correct = 0
                         correctfin = 0
                         correctdebut = 0
-                        dcorrect = 0
-                        dcorrectfin = 0
-                        dcorrectdebut = 0
                         total = 0
                         for num, batch in enumerate(generator_dev):
                             encoder_src.train(False)
                             decoder_src.train(False)
                             encoder_tgt.train(False)
                             decoder_tgt.train(False)
-                            if num < 21:
+                            if num < 11:
                                 all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0]))
                                 all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1]))
                                 all_histoire_fin_embedding2 = Variable(torch.FloatTensor(batch[2]))
@@ -175,9 +164,7 @@ class Script(DefaultScript):
                                     all_histoire_debut_embedding=all_histoire_debut_embedding.cuda()
                                     all_histoire_fin_embedding1=all_histoire_fin_embedding1.cuda()
                                     all_histoire_fin_embedding2=all_histoire_fin_embedding2.cuda()
-
                                 labels = Variable(torch.LongTensor(batch[3]))
-
                                 end = decoder_tgt(encoder_src(all_histoire_debut_embedding))
                                 z_end1 =encoder_src(all_histoire_fin_embedding1)
                                 z_end2=encoder_src(all_histoire_fin_embedding2)
@@ -187,37 +174,28 @@ class Script(DefaultScript):
                                 pred1 = pred1.view(-1)
                                 pred2 = discriminator.forward(z_end2)
                                 pred2 = pred2.view(-1)
-                                sim1 = torch.nn.functional.cosine_embedding_loss(end.transpose(0, 2),
-                                                                                  all_histoire_debut_embedding.transpose(
-                                                                                      0, 2),
-                                                                                  all_histoire_fin_embedding1,reduce=False)
-                                sim2 = torch.nn.functional.cosine_embedding_loss(end.transpose(0, 2),
-                                                                                  all_histoire_debut_embedding.transpose(
-                                                                                      0, 2),
-                                                                                  all_histoire_fin_embedding2)
-                                preds=pred1<pred2
-                                preds_sim=sim1<sim2
+
+                                sim1 = torch.nn.functional.cosine_embedding_loss(end.transpose(0, 2).transpose(0,1),
+                                                                                  all_histoire_fin_embedding1.transpose(
+                                                                                      0, 2).transpose(0,1),
+                                                                                  target_adver_tgt,reduce=False)
+                                sim2 = torch.nn.functional.cosine_embedding_loss(end.transpose(0, 2).transpose(0,1),
+                                                                                  all_histoire_fin_embedding1.transpose(
+                                                                                      0, 2).transpose(0,1),
+                                                                                  target_adver_tgt,reduce=False)
+                                preds=(pred1<pred2).cpu().long()
+                                preds_sim=(sim1>sim2).cpu().long()
+
                                 correct += (preds == labels).sum().item()
                                 correctdebut += (preds_sim == labels).sum().item()
                                 total += self.config.batch_size
                                 print("Accuracy ")
                                 print(correct/ total,correctdebut/ total)
-
-
-
                                 accuracy_summary = tf.Summary()
                                 accuracy_summary.value.add(tag='val_accuracy',
                                                            simple_value=(correct / total))
-                                accuracy_summary.value.add(tag='val_accuracy_fin',
+                                accuracy_summary.value.add(tag='val_accuracy_similitude',
                                                            simple_value=(correctfin / total))
-                                accuracy_summary.value.add(tag='val_accuracy_debut',
-                                                           simple_value=(correctdebut / total))
-                                accuracy_summary.value.add(tag='val_accuracy_dist',
-                                                           simple_value=(dcorrect / total))
-                                accuracy_summary.value.add(tag='val_accuracy_fin_dist',
-                                                           simple_value=(dcorrectfin / total))
-                                accuracy_summary.value.add(tag='val_accuracy_debut_dist',
-                                                           simple_value=(dcorrectdebut / total))
                                 writer.add_summary(accuracy_summary, num + num_1 - 1)
                                 if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                                     plot_acc_avg = correct / total
@@ -226,7 +204,7 @@ class Script(DefaultScript):
                                                    './builds/encoder_source_best.pth')
                                         torch.save(encoder_tgt.state_dict(),
                                                    './builds/encoder_target_best.pth')
-                                        torch.save(decoder_src.decoder_source.state_dict(),
+                                        torch.save(decoder_src.state_dict(),
                                                    './builds/decoder_source_best.pth')
                                         torch.save( decoder_tgt.state_dict(),
                                                    './builds/decoder_target_best.pth')
@@ -235,9 +213,6 @@ class Script(DefaultScript):
                                     correct = 0
                                     correctfin=0
                                     correctdebut=0
-                                    dcorrect = 0
-                                    dcorrectfin = 0
-                                    dcorrectdebut = 0
                                     total = 0
                             else:
                                 print('done validation')
@@ -252,80 +227,6 @@ class Script(DefaultScript):
             torch.save(encoder_tgt.state_dict(), './builds/encoder_target_epoch' + str(epoch) + '.pth')
             torch.save(decoder_src.state_dict(), './builds/decoder_source_epoch' + str(epoch) + '.pth')
             torch.save(decoder_tgt.state_dict(), './builds/decoder_target_epoch' + str(epoch) + '.pth')
-
-    def get_predict(self, end, debut1, debut2, all_histoire_debut_embedding, all_histoire_fin_embedding1,
-                    all_histoire_fin_embedding2):
-        """
-        :param end:
-        :param debut1:
-        :param debut2:
-        :param all_histoire_debut_embedding:
-        :param all_histoire_fin_embedding1:
-        :param all_histoire_fin_embedding2:
-        :return:
-        """
-        semblable_fin1 = []
-        semblable_fin2 = []
-        semblable_debut1 = []
-        semblable_debut2 = []
-        debut1 = debut1.cpu()
-        debut2 = debut2.cpu()
-        all_histoire_debut_embedding = all_histoire_debut_embedding.cpu()
-        end = end.cpu()
-        all_histoire_fin_embedding1 = all_histoire_fin_embedding1.cpu()
-        all_histoire_fin_embedding2 = all_histoire_fin_embedding2.cpu()
-        for num_batch, batch in enumerate(end):
-            for num_sent, sent in enumerate(batch):
-                produit = torch.dot(sent.float(), all_histoire_fin_embedding1[num_batch][num_sent].float()) / (
-                            torch.norm(sent) * torch.norm(
-                        all_histoire_fin_embedding1[num_batch][num_sent]))
-                semblable_fin1.append(produit.cpu().data[0])
-                produit = torch.dot(sent.float(), all_histoire_fin_embedding2[num_batch][num_sent].float()) / (
-                        torch.norm(sent.float()) * torch.norm(all_histoire_fin_embedding2[num_batch][num_sent].float()))
-                semblable_fin2.append(produit.cpu().data[0])
-                produit = torch.dot(debut1[num_batch][num_sent].float(),
-                                    all_histoire_debut_embedding[num_batch][num_sent].float()) / (
-                                  torch.norm(debut1[num_batch][num_sent].float()) * torch.norm(
-                              all_histoire_debut_embedding[num_batch][num_sent].float()))
-                semblable_debut1.append(produit.cpu().data[0])
-                produit = torch.dot(debut2[num_batch][num_sent].float(),
-                                    all_histoire_debut_embedding[num_batch][num_sent].float()) / (
-                                  torch.norm(debut2[num_batch][num_sent].float()) * torch.norm(
-                                  all_histoire_debut_embedding[num_batch][num_sent].float()))
-                semblable_debut2.append(produit.cpu().data[0])
-        p1 = Variable(torch.FloatTensor((np.array(semblable_fin1) + np.array(semblable_debut1)) / 2))
-        p2 = Variable(torch.FloatTensor((np.array(semblable_fin2) + np.array(semblable_debut2)) / 2))
-        p = torch.stack((p1, p2))
-        pf = torch.stack((torch.FloatTensor((np.array(semblable_fin1))), torch.FloatTensor((np.array(semblable_fin2)))))
-        pd = torch.stack((torch.FloatTensor((np.array(semblable_debut1))), torch.FloatTensor((np.array(semblable_debut2)))))
-        (_, pred) = torch.max(p, 0)
-        (_, predfin) = torch.max(pf, 0)
-        (_, preddebut) = torch.max(pd, 0)
-        distancee1=end-all_histoire_fin_embedding1
-        distancee2=end-all_histoire_fin_embedding2
-        distanced1=debut1-all_histoire_debut_embedding
-        distanced2=debut2-all_histoire_debut_embedding
-        df0=[]
-        df00=[]
-        df000=[]
-        for num_batch, batch in enumerate(distancee1):
-            p1=torch.norm(batch)
-            p2=torch.norm(distancee2[num_batch])
-            p = torch.stack((p1, p2))
-            (_, predfin_distance) = torch.min(p, 0)
-            df0.append(predfin_distance.item())
-            p1 = torch.norm(distanced1[num_batch])
-            p2 = torch.norm(distanced2[num_batch])
-            p = torch.stack((p1, p2))
-            (_, preddebut_distance) = torch.min(p, 0)
-            df00.append(preddebut_distance.item())
-            p1 = torch.norm(distanced1[num_batch]+batch)
-            p2 = torch.norm(distanced2[num_batch]+distancee2[num_batch])
-            p = torch.stack((p1, p2))
-            (_, pred_distance) = torch.min(p, 0)
-            df000.append(pred_distance.item())
-
-        return (pred,predfin,preddebut,Variable(torch.LongTensor(df0)),Variable(torch.LongTensor(df00)),Variable(torch.LongTensor(df000)))
 
     def as_minutes(self,s):
         m = math.floor(s / 60)
@@ -357,8 +258,6 @@ class OutputFN:
         all_histoire_fin_embedding = []
         all_histoire_noise_debut = []
         all_histoire_noise_fin = []
-        all_noise_debut = []
-        all_noise_fin = []
         for b in batch:
             histoire_debut = np.array([
                 b[3]])
@@ -401,9 +300,6 @@ class OutputFN:
         label = []
         for b in batch:
             histoire_debut = np.array([
-                b[0],
-                b[1],
-                b[2],
                 b[3]])
             histoire_embedding_debut = self.infersent(histoire_debut)
             all_histoire_debut_embedding.append(histoire_embedding_debut)
