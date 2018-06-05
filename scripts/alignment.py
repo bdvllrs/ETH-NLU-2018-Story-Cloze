@@ -79,7 +79,7 @@ class Script(DefaultScript):
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
 
-        model.fit_generator(generator_training, steps_per_epoch=300,
+        model.fit_generator(generator_training, steps_per_epoch=1,
                             epochs=self.config.n_epochs,
                             verbose=verbose,
                             validation_data=generator_test,
@@ -105,9 +105,13 @@ class Script(DefaultScript):
 
         if self.use_pretrained_models:
             self.decoder_target_model = keras.models.load_model(self.config.alignment.decoder_target_model)
+            self.decoder_target_model.name = "decoder_target_model"
             self.encoder_target_model = keras.models.load_model(self.config.alignment.encoder_target_model)
+            self.encoder_target_model.name = "encoder_target_model"
             self.decoder_src_model = keras.models.load_model(self.config.alignment.decoder_src_model)
+            self.decoder_src_model.name = "decoder_src_model"
             self.encoder_src_model = keras.models.load_model(self.config.alignment.encoder_src_model)
+            self.encoder_src_model.name = "encoder_src_model"
         else:
             # Decoder target
             input_target_decoder = Input((2048,))
@@ -146,9 +150,9 @@ class Script(DefaultScript):
             self.encoder_target_model.compile("adam", "binary_crossentropy")
 
         # Discriminator
-        layer_1_discriminator = Dense(1024)
-        layer_2_discriminator = Dense(512)
-        layer_3_discriminator = Dense(1, activation="sigmoid")
+        layer_1_discriminator = Dense(1024, name="discr_layer_1")
+        layer_2_discriminator = Dense(512, name="discr_layer2")
+        layer_3_discriminator = Dense(1, activation="sigmoid", name="discr_layer3")
         discriminator = EncoderDecoder(layer_1_discriminator, layer_2_discriminator, layer_3_discriminator,
                                        name="discriminator")
 
