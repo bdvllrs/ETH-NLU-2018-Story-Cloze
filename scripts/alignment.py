@@ -63,7 +63,6 @@ class Script(DefaultScript):
         generator_test = test_set.get_batch(self.config.batch_size, self.config.n_epochs)
 
         model = self.build_graph()
-        print(model.summary())
 
         verbose = 0 if not self.config.debug else 1
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -87,7 +86,7 @@ class Script(DefaultScript):
                             validation_steps=len(test_set) / self.config.batch_size,
                             callbacks=[tensorboard, saver])
 
-        if self.config.algnment.is_set('save_encoder_decoder') and self.config.alignment.save_model:
+        if self.config.alignment.is_set('save_encoder_decoder') and self.config.alignment.save_model:
             model_path = os.path.abspath(
                     os.path.join(os.curdir, './builds/' + timestamp))
             model_path += '-alignment_'
