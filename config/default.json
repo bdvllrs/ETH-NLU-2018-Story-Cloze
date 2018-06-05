@@ -24,5 +24,9 @@
   "sentiment_analysis": {
     "vocab_size": 5000,
     "max_length": 100
+  },
+
+  "alignment": {
+
   }
 }
