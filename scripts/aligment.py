@@ -89,30 +89,32 @@ class Script(DefaultScript):
         # Decoder target
         layer_1_target_decoder = Dense(512, activation="relu")
         layer_2_target_decoder = Dense(1024, activation="relu")
-        decoder_target = Lambda(lambda x: layer_2_target_decoder(Dropout(0.3)(layer_1_target_decoder(x))),
-                                output_shape=(1024,))
+        dec_targ = MakeLambdaParallel("decoder_target", layer_1_target_decoder, layer_2_target_decoder)
+        decoder_target = Lambda(lambda x: dec_targ(x), output_shape=(1024,))
 
         # Encoder src
         layer_1_src_encoder = Dense(1024, activation="relu")
         layer_2_src_encoder = Dense(512, activation="relu")
-        encoder_src = Lambda(lambda x: layer_2_src_encoder(Dropout(0.3)(layer_1_src_encoder(x))), output_shape=(512,))
+        enc_src = MakeLambdaParallel("encoder_src", layer_1_src_encoder, layer_2_src_encoder)
+        encoder_src = Lambda(lambda x: enc_src(x), output_shape=(512,))
 
         # Decoder src
         layer_1_src_decoder = Dense(512, activation="relu")
         layer_2_src_decoder = Dense(1024, activation="relu")
-        decoder_src = Lambda(lambda x: layer_2_src_decoder(Dropout(0.3)(layer_1_src_decoder(x))), output_shape=(1024,))
+        dec_src = MakeLambdaParallel("decoder_src", layer_1_src_decoder, layer_2_src_decoder)
+        decoder_src = Lambda(lambda x: dec_src(x), output_shape=(1024,))
 
         # Encoder target
         layer_1_target_encoder = Dense(1024, activation="relu")
         layer_2_target_encoder = Dense(512, activation="relu")
-        encoder_target = Lambda(lambda x: layer_2_target_encoder(Dropout(0.3)(layer_1_target_encoder(x))),
-                                output_shape=(512,))
+        enc_targ = MakeLambdaParallel("encoder_target", layer_1_target_encoder, layer_2_target_encoder)
+        encoder_target = Lambda(lambda x: enc_targ(x), output_shape=(512,))
 
         # Discriminator
         layer_1_discriminator = Dense(256, activation="relu")
         layer_2_discriminator = Dense(1, activation="sigmoid")
-        discriminator = Lambda(lambda x: layer_2_discriminator(Dropout(0.3)(layer_1_discriminator(x))),
-                               output_shape=(1,), name="discriminator")
+        discr = MakeLambdaParallel("discriminator", layer_1_discriminator, layer_2_discriminator)
+        discriminator = Lambda(lambda x: discr(x), output_shape=(1,), name="discriminator")
 
         encoder_src_ntrainable = self.encoder_src(encoder_src)
         encoder_target_ntrainable = self.encoder_target(encoder_target)
@@ -303,3 +305,13 @@ class ElmoEmbedding:
 def preprocess_fn(line):
     output = [line['sentence1'], line['sentence2']]
     return output
+
+
+class MakeLambdaParallel:
+    def __init__(self, name, layer1, layer2):
+        self.layer2 = layer2
+        self.layer1 = layer1
+        self.__name__ = name
+
+    def __call__(self, x):
+        return self.layer2(Dropout(0.3)(self.layer1(x)))
