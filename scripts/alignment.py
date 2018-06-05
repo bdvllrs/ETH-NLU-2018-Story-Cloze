@@ -164,44 +164,40 @@ class Script(DefaultScript):
 
     def define_models(self):
         # Decoder target
-        input_target_decoder = Input((2048,))
-        layer_1_target_decoder = Dense(2048)
-        layer_2_target_decoder = Dense(1024)
-        layer_3_target_decoder = Dense(1024, activation="relu")
-        dec_target = EncoderDecoder(layer_1_target_decoder, layer_2_target_decoder, layer_3_target_decoder)
+        input_target_decoder = Input((4096,))
+        layer_1_target_decoder = Dense(4096)
+        layer_2_target_decoder = Dense(2048, activation="relu")
+        dec_target = EncoderDecoder(layer_1_target_decoder, layer_2_target_decoder)
         self.decoder_target_model = Model(input_target_decoder, dec_target(input_target_decoder))
         self.decoder_target_model.compile("adam", "binary_crossentropy")
 
         # Encoder src
-        input_src_encoder = Input((1024,))
-        layer_1_src_encoder = Dense(1024)
-        layer_2_src_encoder = Dense(1024)
-        layer_3_src_encoder = Dense(2048, activation="relu")
-        encoder_src = EncoderDecoder(layer_1_src_encoder, layer_2_src_encoder, layer_3_src_encoder)
+        input_src_encoder = Input((2048,))
+        layer_1_src_encoder = Dense(2048)
+        layer_2_src_encoder = Dense(4096, activation="relu")
+        encoder_src = EncoderDecoder(layer_1_src_encoder, layer_2_src_encoder)
         self.encoder_src_model = Model(input_src_encoder, encoder_src(input_src_encoder))
         self.encoder_src_model.compile("adam", "binary_crossentropy")
 
         # Decoder src
-        input_src_decoder = Input((2048,))
-        layer_1_src_decoder = Dense(2048)
-        layer_2_src_decoder = Dense(2048)
-        layer_3_src_decoder = Dense(1024, activation="relu")
-        decoder_src = EncoderDecoder(layer_1_src_decoder, layer_2_src_decoder, layer_3_src_decoder)
+        input_src_decoder = Input((4096,))
+        layer_1_src_decoder = Dense(4096)
+        layer_2_src_decoder = Dense(2048, activation="relu")
+        decoder_src = EncoderDecoder(layer_1_src_decoder, layer_2_src_decoder)
         self.decoder_src_model = Model(input_src_decoder, decoder_src(input_src_decoder))
         self.decoder_src_model.compile("adam", "binary_crossentropy")
 
         # Encoder target
-        input_target_encoder = Input((1024,))
-        layer_1_target_encoder = Dense(1024)
-        layer_2_target_encoder = Dense(1024)
-        layer_3_target_encoder = Dense(2048, activation="relu")
-        encoder_target = EncoderDecoder(layer_1_target_encoder, layer_2_target_encoder, layer_3_target_encoder)
+        input_target_encoder = Input((2048,))
+        layer_1_target_encoder = Dense(2048)
+        layer_2_target_encoder = Dense(4096, activation="relu")
+        encoder_target = EncoderDecoder(layer_1_target_encoder, layer_2_target_encoder)
         self.encoder_target_model = Model(input_target_encoder, encoder_target(input_target_encoder))
         self.encoder_target_model.compile("adam", "binary_crossentropy")
 
         # Discriminator
-        input_discriminator = Input((2048,))
-        layer_1_discriminator = Dense(1024, name="discr_layer_1")
+        input_discriminator = Input((4096,))
+        layer_1_discriminator = Dense(1026, name="discr_layer_1")
         layer_2_discriminator = Dense(512, name="discr_layer2")
         layer_3_discriminator = Dense(1, activation="sigmoid", name="discr_layer3")
         discriminator = EncoderDecoder(layer_1_discriminator, layer_2_discriminator, layer_3_discriminator,
@@ -210,10 +206,16 @@ class Script(DefaultScript):
         self.discriminator.compile("adam", "binary_crossentropy")
 
     def build_graph(self):
-        input_src = Input((1024,))  # src sentence (only last sentence of story)
-        input_src_noise = Input((1024,))  # Noise on src sentence
-        input_target = Input((1024,))  # Noise on target sentence
-        input_target_noise = Input((1024,))  # Noise on target sentence
+        input_src_ori = Input((1024,))  # src sentence (only last sentence of story)
+        input_src_noise_ori = Input((1024,))  # Noise on src sentence
+        input_target_ori = Input((1024,))  # Noise on target sentence
+        input_target_noise_ori = Input((1024,))  # Noise on target sentence
+        history_ref_ori = Input((1024,))  # Target of the story
+
+        input_src = keras.layers.concatenate([input_src_ori, history_ref_ori])
+        input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
+        input_target_noise = keras.layers.concatenate([input_target_noise_ori, history_ref_ori])
+        input_target = keras.layers.concatenate([input_target_ori, history_ref_ori])
 
         # Build graph
         src = self.encoder_src_model(input_src_noise)
@@ -261,7 +263,7 @@ class Script(DefaultScript):
                 [diff_out_mix_target_input_target, diff_out_mix_target_input_target], axes=1,
                 name="dist_mix_target_input_src")
 
-        model = Model(inputs=[input_src, input_src_noise, input_target, input_target_noise],
+        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target_ori, input_target_noise_ori, history_ref_ori],
                       outputs=[dist_mix_input_src, dist_mix_target_input_src, dist_src, dist_target,
                                discriminator_src, discriminator_target, discriminator_target_mix,
                                discriminator_src_mix])
@@ -269,10 +271,17 @@ class Script(DefaultScript):
         return model
 
     def build_frozen_graph(self):
-        input_src = Input((1024,))  # src sentence (only last sentence of story)
-        input_src_noise = Input((1024,))  # Noise on src sentence
-        input_target = Input((1024,))  # Noise on target sentence
-        input_target_noise = Input((1024,))  # Noise on target sentence
+        input_src_ori = Input((1024,))  # src sentence (only last sentence of story)
+        input_src_noise_ori = Input((1024,))  # Noise on src sentence
+        input_target_ori = Input((1024,))  # Noise on target sentence
+        input_target_noise_ori = Input((1024,))  # Noise on target sentence
+        history_ref_ori = Input((1024,))  # Target of the story
+
+        input_src = keras.layers.concatenate([input_src_ori, history_ref_ori])
+        input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
+        input_target_noise = keras.layers.concatenate([input_target_noise_ori, history_ref_ori])
+        input_target = keras.layers.concatenate([input_target_ori, history_ref_ori])
+
 
         self.encoder_src_model.trainable = False
         self.encoder_target_model.trainable = False
@@ -303,14 +312,14 @@ class Script(DefaultScript):
         discriminator_target_mix = self.discriminator(out_mix_target_enc)  # Needs to be 0
         discriminator_src_mix = self.discriminator(out_mix_source_enc)
 
-        model = Model(inputs=[input_src, input_src_noise, input_target, input_target_noise],
+        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target_ori, input_target_noise_ori, history_ref_ori],
                       outputs=[discriminator_src, discriminator_target, discriminator_target_mix,
                                discriminator_src_mix])
         model.compile("adam", "binary_crossentropy", ['accuracy'])
         return model
 
     def decoder_target(self, decoder):
-        inp = Input((2048,))
+        inp = Input((4096,))
         decoder.trainable = False
         out = decoder(inp)
         model = Model(inp, out)
@@ -319,7 +328,7 @@ class Script(DefaultScript):
         return model
 
     def decoder_src(self, decoder):
-        inp = Input((2048,))
+        inp = Input((4096,))
         decoder.trainable = False
         out = decoder(inp)
         model = Model(inp, out)
@@ -328,7 +337,7 @@ class Script(DefaultScript):
         return model
 
     def encoder_src(self, encoder):
-        inp = Input((1024,))
+        inp = Input((2048,))
         encoder.trainable = False
         out = encoder(inp)
         model = Model(inp, out)
@@ -337,7 +346,7 @@ class Script(DefaultScript):
         return model
 
     def encoder_target(self, encoder):
-        inp = Input((1024,))
+        inp = Input((2048,))
         encoder.trainable = False
         out = encoder(inp)
         model = Model(inp, out)
@@ -385,11 +394,14 @@ class Script(DefaultScript):
         all_histoire_fin_embedding = []
         all_histoire_noise_debut = []
         all_histoire_noise_fin = []
+        all_history_ref = []
         for b in batch:
-            histoire_debut = b[0][0] + " " + b[0][1]
+            history_ref = b[0][0]
+            histoire_debut = b[0][1]
             histoire_noise_debut = self.add_noise(histoire_debut)
-            histoire_fin = b[1][0] + " " + b[1][1]
+            histoire_fin = b[1][1]
             histoire_noise_fin = self.add_noise(histoire_fin)
+            all_history_ref.append(history_ref)
             if not self.use_frozen:  # We send the real values
                 all_histoire_fin_embedding.append(histoire_fin)
                 all_histoire_noise_debut.append(histoire_noise_debut)
@@ -404,17 +416,19 @@ class Script(DefaultScript):
         all_histoire_debut_embedding = self.embedding(np.array(all_histoire_debut_embedding))
         all_histoire_noise_fin = self.embedding(np.array(all_histoire_noise_fin))
         all_histoire_noise_debut = self.embedding(np.array(all_histoire_noise_debut))
+        all_history_ref_embedding = self.embedding(np.array(all_history_ref))
         if self.use_frozen:  # We swithed up the right and bad ones
             ones = np.ones(len(batch))
             # disriminator bust be at one because inverted
-            return [np.array(all_histoire_debut_embedding), np.array(all_histoire_noise_debut),
-                    np.array(all_histoire_fin_embedding), np.array(all_histoire_noise_fin)], [ones, ones, ones,
-                                                                                              ones]
+            return [all_histoire_debut_embedding, all_histoire_noise_debut,
+                    all_histoire_fin_embedding, all_histoire_noise_fin, all_history_ref_embedding], [ones, ones, ones,
+                                                                                                     ones]
         zeros = np.zeros(len(batch))
-        return [np.array(all_histoire_debut_embedding), np.array(all_histoire_noise_debut),
-                np.array(all_histoire_fin_embedding), np.array(all_histoire_noise_fin)], [zeros, zeros, zeros,
-                                                                                          zeros, zeros, zeros, zeros,
-                                                                                          zeros]
+        return [all_histoire_debut_embedding, all_histoire_noise_debut,
+                all_histoire_fin_embedding, all_histoire_noise_fin, all_history_ref_embedding], [zeros, zeros, zeros,
+                                                                                                 zeros, zeros, zeros,
+                                                                                                 zeros,
+                                                                                                 zeros]
 
     def output_fn_test(self, data):
         """
@@ -426,12 +440,14 @@ class Script(DefaultScript):
         all_histoire_fin_embedding = []
         all_histoire_noise_debut = []
         all_histoire_noise_fin = []
+        all_history_ref = []
         label1 = []
         label2 = []
         for b in batch:
-            histoire_debut = " ".join(b[3]) + " " + " ".join(b[4])
+            all_history_ref.append(" ".join(b[3]))
+            histoire_debut = " ".join(b[4])
             histoire_noise_debut = self.add_noise(histoire_debut)
-            histoire_fin = " ".join(b[3]) + " " + " ".join(b[5])
+            histoire_fin = " ".join(b[5])
             histoire_noise_fin = self.add_noise(histoire_fin)
             all_histoire_debut_embedding.append(histoire_debut)
             all_histoire_fin_embedding.append(histoire_fin)
@@ -446,12 +462,13 @@ class Script(DefaultScript):
         all_histoire_debut_embedding = self.embedding(np.array(all_histoire_debut_embedding))
         all_histoire_noise_fin = self.embedding(np.array(all_histoire_noise_fin))
         all_histoire_noise_debut = self.embedding(np.array(all_histoire_noise_debut))
+        all_history_ref_embedding = self.embedding(np.array(all_history_ref))
         label1 = np.array(label1)
         label2 = np.array(label2)
-        return [np.array(all_histoire_debut_embedding),
-                np.array(all_histoire_noise_debut),
-                np.array(all_histoire_fin_embedding),
-                np.array(all_histoire_noise_fin)], [label1, label2, label1, label2]
+        return [all_histoire_debut_embedding,
+                all_histoire_noise_debut,
+                all_histoire_fin_embedding,
+                all_histoire_noise_fin, all_history_ref_embedding], [label1, label2, label1, label2]
 
 
 class ElmoEmbedding:
@@ -470,17 +487,22 @@ def preprocess_fn(line):
 
 
 class EncoderDecoder:
-    def __init__(self, layer1, layer2, layer3, name=None):
+    def __init__(self, layer1, layer2, layer3=None, name=None):
         self.layer2 = layer2
         self.layer1 = layer1
         self.layer3 = layer3
-        if name is not None:
+        if name is not None and layer3 is not None:
             self.layer3.name = name
+        elif name is not None:
+            self.layer2.name = name
 
     def __call__(self, x):
         l1 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer1(x))))
-        l2 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer2(l1))))
-        return BatchNormalization()(self.layer3(l2))
+        if self.layer3 is not None:
+            l2 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer2(l1))))
+            return BatchNormalization()(self.layer3(l2))
+        else:
+            return BatchNormalization()(self.layer2(l1))
 
 
 def print_on_tensorboard(writer, metrics, results, k, prefix=""):
@@ -510,4 +532,3 @@ def get_dict_from_lists(keys, values):
     for name, value in zip(keys, values):
         result[name] = value
     return result
-
