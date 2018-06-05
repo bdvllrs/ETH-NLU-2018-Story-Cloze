@@ -149,8 +149,6 @@ class Script(DefaultScript):
             if k > 0 and not k % self.config.test_and_save_every:
                 test_metrics = []
                 for j, (inputs_val, labels_val) in enumerate(generator_dev):
-                    if j >= 2:
-                        break
                     test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
                 test_metrics = np.mean(test_metrics, axis=0)
                 # Save value to tensorboard
