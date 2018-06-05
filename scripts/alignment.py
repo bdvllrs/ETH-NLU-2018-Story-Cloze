@@ -7,7 +7,7 @@ import tensorflow_hub as hub
 import keras.backend as K
 import numpy as np
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout, LeakyReLU, BatchNormalization
+from keras.layers import Input, Dense, Dropout, LeakyReLU, BatchNormalization, Lambda
 
 from utils import Dataloader, SNLIDataloaderPairs
 from scripts import DefaultScript
@@ -159,8 +159,9 @@ class Script(DefaultScript):
         target = self.encoder_target_model(input_target_noise)
         out_target = self.decoder_target_model(target)  # Must be equal to input_target
 
-        discriminator_src = discriminator(src)  # 0 src = true sentence, 1 target = wrong
-        discriminator_target = discriminator(target)
+        discriminator_src = Lambda(lambda x: x, name="disrc_src")(
+            discriminator(src))  # 0 src = true sentence, 1 target = wrong
+        discriminator_target = Lambda(lambda x: x, name="disrc_target")(discriminator(target))
 
         # Calculate differences
         diff_out_src_input_src = keras.layers.subtract([out_src, input_src])
