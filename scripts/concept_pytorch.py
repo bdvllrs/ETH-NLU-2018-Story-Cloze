@@ -8,8 +8,8 @@ import time
 from utils.Trainer import Seq2SeqTrainer
 USE_CUDA = torch.cuda.is_available()
 import tensorflow as tf
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/')
+
+
 class Script(DefaultScript):
     slug = 'concept_fb'
 
@@ -41,6 +41,8 @@ class Script(DefaultScript):
                                             self.config.attention_bolean, dropout=0.5,
                                             learning_rate=0.0003,
                                             plot_every=20, print_every=100, evaluate_every=1000)
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/')
         plot_loss_total = 0
         plot_loss_total_auto = 0
         plot_loss_total_cross = 0
