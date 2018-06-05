@@ -7,7 +7,7 @@ import tensorflow_hub as hub
 import keras.backend as K
 import numpy as np
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout
+from keras.layers import Input, Dense, Dropout, Lambda
 
 from utils import Dataloader, SNLIDataloaderPairs
 from scripts import DefaultScript
@@ -77,7 +77,7 @@ class Script(DefaultScript):
                             epochs=self.config.n_epochs,
                             verbose=verbose,
                             validation_data=generator_test,
-                            validation_steps=len(test_set)/self.config.batch_size,
+                            validation_steps=len(test_set) / self.config.batch_size,
                             callbacks=[tensorboard, saver])
 
     def build_graph(self):
@@ -89,27 +89,30 @@ class Script(DefaultScript):
         # Decoder target
         layer_1_target_decoder = Dense(512, activation="relu")
         layer_2_target_decoder = Dense(1024, activation="relu")
-        decoder_target = lambda x: layer_2_target_decoder(Dropout(0.3)(layer_1_target_decoder(x)))
+        decoder_target = Lambda(lambda x: layer_2_target_decoder(Dropout(0.3)(layer_1_target_decoder(x))),
+                                output_shape=(1024,))
 
         # Encoder src
         layer_1_src_encoder = Dense(1024, activation="relu")
         layer_2_src_encoder = Dense(512, activation="relu")
-        encoder_src = lambda x: layer_2_src_encoder(Dropout(0.3)(layer_1_src_encoder(x)))
+        encoder_src = Lambda(lambda x: layer_2_src_encoder(Dropout(0.3)(layer_1_src_encoder(x))), output_shape=(512,))
 
         # Decoder src
         layer_1_src_decoder = Dense(512, activation="relu")
         layer_2_src_decoder = Dense(1024, activation="relu")
-        decoder_src = lambda x: layer_2_src_decoder(Dropout(0.3)(layer_1_src_decoder(x)))
+        decoder_src = Lambda(lambda x: layer_2_src_decoder(Dropout(0.3)(layer_1_src_decoder(x))), output_shape=(1024,))
 
         # Encoder target
         layer_1_target_encoder = Dense(1024, activation="relu")
         layer_2_target_encoder = Dense(512, activation="relu")
-        encoder_target = lambda x: layer_2_target_encoder(Dropout(0.3)(layer_1_target_encoder(x)))
+        encoder_target = Lambda(lambda x: layer_2_target_encoder(Dropout(0.3)(layer_1_target_encoder(x))),
+                                output_shape=(512,))
 
         # Discriminator
         layer_1_discriminator = Dense(256, activation="relu")
         layer_2_discriminator = Dense(1, activation="sigmoid")
-        discriminator = lambda x: layer_2_discriminator(Dropout(0.3)(layer_1_discriminator(x)))
+        discriminator = Lambda(lambda x: layer_2_discriminator(Dropout(0.3)(layer_1_discriminator(x))),
+                               output_shape=(1,), name="discriminator")
 
         encoder_src_ntrainable = self.encoder_src(encoder_src)
         encoder_target_ntrainable = self.encoder_target(encoder_target)
@@ -142,16 +145,19 @@ class Script(DefaultScript):
         diff_out_src_input_src = keras.layers.subtract([out_src, input_src])
         diff_out_target_input_target = keras.layers.subtract([out_target, input_target])
 
-        dist_mix_input_src = keras.layers.dot([diff_out_mix_src_input_src, diff_out_mix_src_input_src], axes=1, name="dist_mix_input_src")
+        dist_mix_input_src = keras.layers.dot([diff_out_mix_src_input_src, diff_out_mix_src_input_src], axes=1,
+                                              name="dist_mix_input_src")
         dist_mix_target_input_src = keras.layers.dot(
-                [diff_out_mix_target_input_target, diff_out_mix_target_input_target], axes=1, name="dist_mix_target_input_src")
+                [diff_out_mix_target_input_target, diff_out_mix_target_input_target], axes=1,
+                name="dist_mix_target_input_src")
         dist_src = keras.layers.dot([diff_out_src_input_src, diff_out_src_input_src], axes=1, name="dist_src")
-        dist_target = keras.layers.dot([diff_out_target_input_target, diff_out_target_input_target], axes=1, name="dist_target")
+        dist_target = keras.layers.dot([diff_out_target_input_target, diff_out_target_input_target], axes=1,
+                                       name="dist_target")
 
         model = Model(inputs=[input_src, input_src_noise, input_target, input_target_noise],
                       outputs=[dist_mix_input_src, dist_mix_target_input_src, dist_src, dist_target, discriminator_src,
                                discriminator_target, discriminator_target_mix, discriminator_src_mix])
-        model.compile(optimizer="adam", loss="mean_squared_error", metrics=['accuracy'])
+        model.compile(optimizer="adam", loss="binary_crossentropy", metrics=['accuracy'])
         return model
 
     def decoder_target(self, decoder):
@@ -297,4 +303,3 @@ class ElmoEmbedding:
 def preprocess_fn(line):
     output = [line['sentence1'], line['sentence2']]
     return output
-
