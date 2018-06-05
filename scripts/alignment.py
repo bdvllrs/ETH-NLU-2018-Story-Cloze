@@ -79,7 +79,7 @@ class Script(DefaultScript):
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
 
-        model.fit_generator(generator_training, steps_per_epoch=len(train_set) / self.config.batch_size,
+        model.fit_generator(generator_training, steps_per_epoch=300,
                             epochs=self.config.n_epochs,
                             verbose=verbose,
                             validation_data=generator_test,

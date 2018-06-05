@@ -36,7 +36,7 @@ class Config:
         Check if the value exists
         """
         is_set = True
-        if key is not None:
+        if self._is_set and key is not None:
             is_set = key in self.config.keys()
         return self._is_set and is_set
 
