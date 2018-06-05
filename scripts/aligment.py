@@ -7,7 +7,7 @@ import tensorflow_hub as hub
 import keras.backend as K
 import numpy as np
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout, Lambda
+from keras.layers import Input, Dense, Dropout, LeakyReLU, BatchNormalization
 
 from utils import Dataloader, SNLIDataloaderPairs
 from scripts import DefaultScript
@@ -57,6 +57,7 @@ class Script(DefaultScript):
         generator_test = test_set.get_batch(self.config.batch_size, self.config.n_epochs)
 
         model = self.build_graph()
+        print(model.summary())
 
         verbose = 0 if not self.config.debug else 1
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -87,34 +88,34 @@ class Script(DefaultScript):
         input_target_noise = Input((1024,))  # Noise on target sentence
 
         # Decoder target
-        layer_1_target_decoder = Dense(512, activation="relu")
-        layer_2_target_decoder = Dense(1024, activation="relu")
-        dec_targ = MakeLambdaParallel("decoder_target", layer_1_target_decoder, layer_2_target_decoder)
-        decoder_target = Lambda(dec_targ, output_shape=(1024,))
+        layer_1_target_decoder = Dense(2048)
+        layer_2_target_decoder = Dense(1024)
+        layer_3_target_decoder = Dense(1024, activation="relu")
+        decoder_target = EncoderDecoder(layer_1_target_decoder, layer_2_target_decoder, layer_3_target_decoder)
 
         # Encoder src
-        layer_1_src_encoder = Dense(1024, activation="relu")
-        layer_2_src_encoder = Dense(512, activation="relu")
-        enc_src = MakeLambdaParallel("encoder_src", layer_1_src_encoder, layer_2_src_encoder)
-        encoder_src = Lambda(enc_src, output_shape=(512,))
+        layer_1_src_encoder = Dense(1024)
+        layer_2_src_encoder = Dense(1024)
+        layer_3_src_encoder = Dense(2048, activation="relu")
+        encoder_src = EncoderDecoder(layer_1_src_encoder, layer_2_src_encoder, layer_3_src_encoder)
 
         # Decoder src
-        layer_1_src_decoder = Dense(512, activation="relu")
-        layer_2_src_decoder = Dense(1024, activation="relu")
-        dec_src = MakeLambdaParallel("decoder_src", layer_1_src_decoder, layer_2_src_decoder)
-        decoder_src = Lambda(dec_src, output_shape=(1024,))
+        layer_1_src_decoder = Dense(2048)
+        layer_2_src_decoder = Dense(2048)
+        layer_3_src_decoder = Dense(1024, activation="relu")
+        decoder_src = EncoderDecoder(layer_1_src_decoder, layer_2_src_decoder, layer_3_src_decoder)
 
         # Encoder target
-        layer_1_target_encoder = Dense(1024, activation="relu")
-        layer_2_target_encoder = Dense(512, activation="relu")
-        enc_targ = MakeLambdaParallel("encoder_target", layer_1_target_encoder, layer_2_target_encoder)
-        encoder_target = Lambda(enc_targ, output_shape=(512,))
+        layer_1_target_encoder = Dense(1024)
+        layer_2_target_encoder = Dense(1024)
+        layer_3_target_encoder = Dense(2048, activation="relu")
+        encoder_target = EncoderDecoder(layer_1_target_encoder, layer_2_target_encoder, layer_3_target_encoder)
 
         # Discriminator
-        layer_1_discriminator = Dense(256, activation="relu")
-        layer_2_discriminator = Dense(1, activation="sigmoid")
-        discr = MakeLambdaParallel("discriminator", layer_1_discriminator, layer_2_discriminator)
-        discriminator = Lambda(discr, output_shape=(1,), name="discriminator")
+        layer_1_discriminator = Dense(1024)
+        layer_2_discriminator = Dense(512)
+        layer_3_discriminator = Dense(1, activation="sigmoid")
+        discriminator = EncoderDecoder(layer_1_discriminator, layer_2_discriminator, layer_3_discriminator, name="discriminator")
 
         encoder_src_ntrainable = self.encoder_src(encoder_src)
         encoder_target_ntrainable = self.encoder_target(encoder_target)
@@ -163,19 +164,21 @@ class Script(DefaultScript):
         return model
 
     def decoder_target(self, decoder):
-        inp = Input((512,))
+        inp = Input((2048,))
         decoder.trainable = False
         out = decoder(inp)
         model = Model(inp, out)
-        model.compile("adam", "categorical_crossentropy")
+        model.compile("adam", "binary_crossentropy")
+        decoder.trainable = True
         return model
 
     def decoder_src(self, decoder):
-        inp = Input((512,))
+        inp = Input((2048,))
         decoder.trainable = False
         out = decoder(inp)
         model = Model(inp, out)
-        model.compile("adam", "categorical_crossentropy")
+        model.compile("adam", "binary_crossentropy")
+        decoder.trainable = True
         return model
 
     def encoder_src(self, encoder):
@@ -183,7 +186,8 @@ class Script(DefaultScript):
         encoder.trainable = False
         out = encoder(inp)
         model = Model(inp, out)
-        model.compile("adam", "categorical_crossentropy")
+        model.compile("adam", "binary_crossentropy")
+        encoder.trainable = True
         return model
 
     def encoder_target(self, encoder):
@@ -191,7 +195,8 @@ class Script(DefaultScript):
         encoder.trainable = False
         out = encoder(inp)
         model = Model(inp, out)
-        model.compile("adam", "categorical_crossentropy")
+        model.compile("adam", "binary_crossentropy")
+        encoder.trainable = True
         return model
 
     def add_noise(self, variable, drop_probability: float = 0.1, shuffle_max_distance: int = 3):
@@ -307,11 +312,15 @@ def preprocess_fn(line):
     return output
 
 
-class MakeLambdaParallel:
-    def __init__(self, name, layer1, layer2):
+class EncoderDecoder:
+    def __init__(self, layer1, layer2, layer3, name=None):
         self.layer2 = layer2
         self.layer1 = layer1
-        self.__name__ = name
+        self.layer3 = layer3
+        if name is not None:
+            self.layer3.name = name
 
     def __call__(self, x):
-        return self.layer2(Dropout(0.3)(self.layer1(x)))
+        l1 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer1(x))))
+        l2 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer2(l1))))
+        return BatchNormalization()(self.layer3(l2))
