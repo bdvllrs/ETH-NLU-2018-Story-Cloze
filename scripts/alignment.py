@@ -133,7 +133,6 @@ class Script(DefaultScript):
         min_source_loss = None
 
         for k, (inputs, labels) in enumerate(generator_training):
-            print(self.use_frozen, "use frozen in for loop")
             # We train the frozen model and the unfrozen model jointly
             if self.use_frozen:
                 # Generator training
@@ -384,7 +383,6 @@ class Script(DefaultScript):
         return result
 
     def output_fn(self, _, batch):
-        print(self.use_frozen, "use frozen")
         all_histoire_debut_embedding = []
         all_histoire_fin_embedding = []
         all_histoire_noise_debut = []
