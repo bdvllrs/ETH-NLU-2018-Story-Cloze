@@ -32,7 +32,7 @@ class Script(DefaultScript):
 
         # If we gave the models to the encoder decodes...
         self.use_pretrained_models = self.config.alignment.is_set(
-            'decoder_target_model') and self.config.alignment.is_set(
+                'decoder_target_model') and self.config.alignment.is_set(
                 'decoder_src_model') and self.config.alignment.is_set(
                 'encoder_target_model') and self.config.alignment.is_set('encoder_src_model')
 
@@ -79,7 +79,7 @@ class Script(DefaultScript):
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
 
-        model.fit_generator(generator_training, steps_per_epoch=100,
+        model.fit_generator(generator_training, steps_per_epoch=len(train_set) / self.config.batch_size,
                             epochs=self.config.n_epochs,
                             verbose=verbose,
                             validation_data=generator_test,
