@@ -86,7 +86,8 @@ class Script(DefaultScript):
                             validation_steps=len(test_set) / self.config.batch_size,
                             callbacks=[tensorboard, saver])
 
-        if self.config.alignment.is_set('save_encoder_decoder') and self.config.alignment.save_model:
+        if self.config.alignment.is_set('save_encoder_decoder') and self.config.alignment.save_encoder_decoder:
+            print('saving models')
             model_path = os.path.abspath(
                     os.path.join(os.curdir, './builds/' + timestamp))
             model_path += '-alignment_'
