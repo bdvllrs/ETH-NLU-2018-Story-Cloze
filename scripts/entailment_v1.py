@@ -11,11 +11,16 @@ https://towardsdatascience.com/elmo-embeddings-in-keras-with-tensorflow-hub-7eb6
 """
 import datetime
 import os
+import random
+
 import keras
 from keras import backend as K
+from keras.layers import BatchNormalization
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
+
+from utils import Dataloader
 from utils import SNLIDataloader
 from nltk import word_tokenize
 from scripts import DefaultScript
@@ -33,10 +38,8 @@ def preprocess_fn(line):
     label = 1
     if line['gold_label'] == 'contradiction':
         label = 0
-    elif line['gold_label'] == 'neutral':
-        label = 1
-    sentence1 = ' '.join(word_tokenize(line['sentence1']))
-    sentence2 = ' '.join(word_tokenize(line['sentence2']))
+    sentence1 = line['sentence1']
+    sentence2 = line['sentence2']
     output = [label, sentence1, sentence2]
     return output
 
@@ -44,6 +47,24 @@ def preprocess_fn(line):
 def output_fn(_, batch):
     batch = np.array(batch, dtype=object)
     return [batch[:, 1], batch[:, 2]], np.array(list(batch[:, 0]))
+
+
+def output_fn_test(data):
+    batch = np.array(data.batch)
+    ref_sentences = []
+    input_sentences = []
+    label = []
+    for b in batch:
+        sentence = " ".join(b[3])
+        if random.random() > 0.5:
+            input_sentences.append(" ".join(b[4]))
+            label.append(2 - int(b[6][0]))
+        else:
+            input_sentences.append(" ".join(b[5]))
+            label.append(int(b[6][0]) - 1)
+        ref_sentences.append(sentence)
+    ref_sentences, input_sentences = np.array(ref_sentences, dtype=object), np.array(input_sentences, dtype=object)
+    return [ref_sentences, input_sentences], np.array(label)
 
 
 class ElmoEmbedding:
@@ -64,7 +85,7 @@ class IntraAttn:
 
     def __call__(self, x):
         weights = keras.layers.Dropout(0.2)(self.attn_layer_1(x))
-        weights = keras.layers.Dropout(0.2)(self.attn_layer_2(weights))
+        weights = BatchNormalization()(keras.layers.Dropout(0.2)(self.attn_layer_2(weights)))
         attn_weights = K.batch_dot(K.permute_dimensions(weights, (0, 2, 1)), weights, axes=(1, 2))
         attn = K.softmax(attn_weights, axis=1)
         # batch_size x lB x 1024
@@ -80,9 +101,9 @@ class AlphaFN:
 
     def __call__(self, x):
         weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[0]))
-        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1))
+        weights_1 = BatchNormalization()(keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1)))
         weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[1]))
-        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2))
+        weights_2 = BatchNormalization()(keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2)))
         # batch_size x lA x lB
         attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
         alpha = K.softmax(attend_weights, axis=1)
@@ -99,9 +120,9 @@ class BetaFN:
 
     def __call__(self, x):
         weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[0]))
-        weights_1 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1))
+        weights_1 = BatchNormalization()(keras.layers.Dropout(0.2)(self.attend_layer_2(weights_1)))
         weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_1(x[1]))
-        weights_2 = keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2))
+        weights_2 = BatchNormalization()(keras.layers.Dropout(0.2)(self.attend_layer_2(weights_2)))
         # batch_size x lA x lB
         attend_weights = K.batch_dot(K.permute_dimensions(weights_1, (0, 2, 1)), weights_2, axes=(1, 2))
         beta = K.softmax(attend_weights, axis=2)
@@ -126,15 +147,15 @@ def model(sess, config):
     elmo_embeddings = ElmoEmbedding(elmo_model)
 
     # Attention
-    attn_layer_1 = keras.layers.Dense(500, activation='relu')
+    attn_layer_1 = keras.layers.Dense(1024, activation='relu')
     attn_layer_2 = keras.layers.Dense(500, activation='relu')
 
     # Attend
-    attend_layer_1 = keras.layers.Dense(500, activation='relu')
+    attend_layer_1 = keras.layers.Dense(1024, activation='relu')
     attend_layer_2 = keras.layers.Dense(500, activation='relu')
 
     # Compare
-    compare_layer_1 = keras.layers.Dense(500, activation="relu")
+    compare_layer_1 = keras.layers.Dense(1024, activation="relu")
     compare_layer_2 = keras.layers.Dense(500, activation="relu")
 
     # Predict
@@ -167,11 +188,11 @@ def model(sess, config):
             [sentence_1_attn, sentence_2_attn])
 
     in_v1 = keras.layers.concatenate([sentence_1_attn, beta])
-    in_v1 = keras.layers.Dropout(0.2)(compare_layer_1(in_v1))
-    in_v1 = keras.layers.Dropout(0.2)(compare_layer_2(in_v1))
+    in_v1 = BatchNormalization()(keras.layers.Dropout(0.2)(compare_layer_1(in_v1)))
+    in_v1 = BatchNormalization()(keras.layers.Dropout(0.2)(compare_layer_2(in_v1)))
     in_v2 = keras.layers.concatenate([sentence_2_attn, alpha])
-    in_v2 = keras.layers.Dropout(0.2)(compare_layer_1(in_v2))
-    in_v2 = keras.layers.Dropout(0.2)(compare_layer_2(in_v2))
+    in_v2 = BatchNormalization()(keras.layers.Dropout(0.2)(compare_layer_1(in_v2)))
+    in_v2 = BatchNormalization()(keras.layers.Dropout(0.2)(compare_layer_2(in_v2)))
     v1 = reduce_sum_layer(in_v1)
     v2 = reduce_sum_layer(in_v2)
 
@@ -188,9 +209,11 @@ def main(config):
     train_set = SNLIDataloader('data/snli_1.0/snli_1.0_train.jsonl')
     train_set.set_preprocess_fn(preprocess_fn)
     train_set.set_output_fn(output_fn)
-    dev_set = SNLIDataloader('data/snli_1.0/snli_1.0_dev.jsonl')
-    dev_set.set_preprocess_fn(preprocess_fn)
-    dev_set.set_output_fn(output_fn)
+    dev_set = Dataloader(config, 'data/test_stories.csv', testing_data=True)
+    # dev_set.set_preprocess_fn(preprocess_fn)
+    dev_set.load_dataset('data/test.bin')
+    dev_set.load_vocab('./data/default.voc', config.vocab_size)
+    dev_set.set_output_fn(output_fn_test)
     # test_set = SNLIDataloader('data/snli_1.0/snli_1.0_test.jsonl')
 
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
@@ -201,6 +224,7 @@ def main(config):
     K.set_session(sess)  # Set to keras backend
 
     keras_model = model(sess, config)
+    print(keras_model.summary())
 
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
