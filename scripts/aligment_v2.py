@@ -11,8 +11,6 @@ from utils import Discriminator
 USE_CUDA = torch.cuda.is_available()
 import tensorflow as tf
 
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/')
 from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +19,8 @@ class Script(DefaultScript):
     slug = 'aligment_v2'
 
     def train(self):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        writer = tf.summary.FileWriter('./logs/' + timestamp + '-concept-fb/')
         output_fn = OutputFN(self.config.GLOVE_PATH, self.config.model_path)
         train_set = Dataloader(self.config, 'data/train_stories.csv')
         test_set = Dataloader(self.config, 'data/test_stories.csv', testing_data=True)
