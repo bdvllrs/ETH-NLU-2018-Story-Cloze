@@ -52,8 +52,9 @@ class Script(DefaultScript):
         target_adver_src = Variable(torch.zeros(self.config.batch_size)).cuda()
         target_adver_tgt = Variable(torch.ones(self.config.batch_size)).cuda()
         plot_loss_total = 0
-        plot_loss_total_auto = 0
-        plot_loss_total_cross = 0
+
+
+        compteur=0
         compteur_val = 0
         while epoch < self.config.n_epochs:
             print("Epoch:", epoch)
@@ -63,74 +64,112 @@ class Script(DefaultScript):
                 all_histoire_fin_embedding = Variable(torch.FloatTensor(batch[1])).cuda()
                 all_histoire_debut_noise =Variable(torch.FloatTensor(batch[2])).cuda()
                 all_histoire_fin_noise = Variable(torch.FloatTensor(batch[3])).cuda()
-                #Model
-                encoder_optimizer_source.zero_grad()
-                decoder_optimizer_source.zero_grad()
-                encoder_optimizer_target.zero_grad()
-                decoder_optimizer_target.zero_grad()
-                discriminator_optmizer.zero_grad()
-                encoder_src.train(True)
-                decoder_src.train(True)
-                encoder_tgt.train(True)
-                decoder_tgt.train(True)
-                discriminator.train(True)
-                #autoencoder
-                #1
-                z_src_autoencoder=encoder_src(all_histoire_debut_noise)
-                pred_discriminator_src=discriminator.forward(z_src_autoencoder)
-                pred_discriminator_src = pred_discriminator_src.view(-1)
-                adv_loss1 = criterion_adver(pred_discriminator_src, target_adver_src)
-                out_src_auto = decoder_src(z_src_autoencoder)
-                loss1=torch.nn.functional.cosine_embedding_loss(out_src_auto.transpose(0,2).transpose(0,1),all_histoire_debut_noise.transpose(0,2).transpose(0,1),target_adver_tgt)
-                #2
-                z_tgt_autoencoder = encoder_tgt(all_histoire_fin_noise)
-                pred_discriminator_tgt = discriminator.forward(z_tgt_autoencoder)
-                pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
-                adv_loss2 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
-                out_tgt_auto = decoder_tgt(z_tgt_autoencoder)
-                loss2 = torch.nn.functional.cosine_embedding_loss(out_tgt_auto.transpose(0, 2).transpose(0,1),
-                                                                  all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
-                                                                  target_adver_tgt)
-                if epoch == 1:
-                    y_src_eval= all_histoire_debut_noise
-                    y_tgt_eval = all_histoire_fin_noise
-                else:
-                    encoder_src.train(False)
-                    decoder_src.train(False)
-                    encoder_tgt.train(False)
-                    decoder_tgt.train(False)
-                    y_tgt_eval = decoder_tgt(encoder_src(all_histoire_debut_embedding))
-                    y_src_eval = decoder_src(encoder_tgt(all_histoire_fin_embedding))
+                if num%2==0:
+                    encoder_optimizer_source.zero_grad()
+                    decoder_optimizer_source.zero_grad()
+                    encoder_optimizer_target.zero_grad()
+                    decoder_optimizer_target.zero_grad()
                     encoder_src.train(True)
                     decoder_src.train(True)
                     encoder_tgt.train(True)
                     decoder_tgt.train(True)
-                #evaluate1
-                z_src_cross=encoder_src(y_src_eval)
-                pred_fin = decoder_tgt(z_src_cross)
-                pred_discriminator_src = discriminator.forward(z_src_cross)
-                pred_discriminator_src = pred_discriminator_src.view(-1)
-                adv_loss3 = criterion_adver(pred_discriminator_src, target_adver_src)
-                loss3 = torch.nn.functional.cosine_embedding_loss(pred_fin.transpose(0, 2).transpose(0,1),
-                                                                  all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
-                                                                  target_adver_tgt)
-                # evaluate2
-                z_tgt_cross = encoder_tgt(y_tgt_eval)
-                pred_debut = decoder_src(z_tgt_cross)
-                pred_discriminator_tgt = discriminator.forward(z_tgt_cross)
-                pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
-                adv_loss4 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
-                loss4 = torch.nn.functional.cosine_embedding_loss(pred_debut.transpose(0, 2).transpose(0,1),
-                                                                  all_histoire_debut_embedding.transpose(0, 2).transpose(0,1),
-                                                                  target_adver_tgt)
-                total_loss=loss1+loss2+loss3+loss4+adv_loss1+adv_loss2+adv_loss3+adv_loss4
-                #upgrade
-                total_loss.backward()
-                encoder_optimizer_source.step()
-                decoder_optimizer_source.step()
-                encoder_optimizer_target.step()
-                decoder_optimizer_target.step()
-                discriminator_optmizer.step()
+                    discriminator.train(False)
+                    z_src_autoencoder=encoder_src(all_histoire_debut_noise)
+                    out_src_auto = decoder_src(z_src_autoencoder)
+                    loss1=torch.nn.functional.cosine_embedding_loss(out_src_auto.transpose(0,2).transpose(0,1),all_histoire_debut_noise.transpose(0,2).transpose(0,1),target_adver_tgt)
+                    z_tgt_autoencoder = encoder_tgt(all_histoire_fin_noise)
+                    out_tgt_auto = decoder_tgt(z_tgt_autoencoder)
+                    loss2 = torch.nn.functional.cosine_embedding_loss(out_tgt_auto.transpose(0, 2).transpose(0,1),
+                                                                      all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
+                                                                      target_adver_tgt)
+                    if epoch == 1:
+                        y_src_eval= all_histoire_debut_noise
+                        y_tgt_eval = all_histoire_fin_noise
+                    else:
+                        encoder_src.train(False)
+                        decoder_src.train(False)
+                        encoder_tgt.train(False)
+                        decoder_tgt.train(False)
+                        y_tgt_eval = decoder_tgt(encoder_src(all_histoire_debut_embedding))
+                        y_src_eval = decoder_src(encoder_tgt(all_histoire_fin_embedding))
+                        encoder_src.train(True)
+                        decoder_src.train(True)
+                        encoder_tgt.train(True)
+                        decoder_tgt.train(True)
+
+                    z_src_cross=encoder_src(y_src_eval)
+                    pred_fin = decoder_tgt(z_src_cross)
+                    loss3 = torch.nn.functional.cosine_embedding_loss(pred_fin.transpose(0, 2).transpose(0,1),
+                                                                      all_histoire_fin_embedding.transpose(0, 2).transpose(0,1),
+                                                                      target_adver_tgt)
+                    # evaluate2
+                    z_tgt_cross = encoder_tgt(y_tgt_eval)
+                    pred_debut = decoder_src(z_tgt_cross)
+                    loss4 = torch.nn.functional.cosine_embedding_loss(pred_debut.transpose(0, 2).transpose(0,1),
+                                                                      all_histoire_debut_embedding.transpose(0, 2).transpose(0,1),
+                                                                      target_adver_tgt)
+                    total_loss=loss1+loss2+loss3+loss4
+
+                    total_loss.backward()
+                    encoder_optimizer_source.step()
+                    decoder_optimizer_source.step()
+                    encoder_optimizer_target.step()
+                    decoder_optimizer_target.step()
+
+                else:
+                    #REDEFINIR lINPUT du DATASET
+                    new_X=[]
+                    new_Y_src=[]
+                    new_Y_tgt=[]
+                    for num,batch in enumerate(all_histoire_debut_embedding):
+                        if random.random()>0.5:
+                            new_X.append(batch)
+                            new_Y_src.append(1)
+
+                        else:
+
+
+                    discriminator_optmizer.zero_grad()
+                    discriminator.train(True)
+                    encoder_src.train(False)
+                    decoder_src.train(False)
+                    encoder_tgt.train(False)
+                    decoder_tgt.train(False)
+                    z_src_autoencoder=encoder_src(all_histoire_debut_noise)
+                    pred_discriminator_src=discriminator.forward(z_src_autoencoder)
+                    pred_discriminator_src = pred_discriminator_src.view(-1)
+                    adv_loss1 = criterion_adver(pred_discriminator_src, target_adver_src)
+                    z_tgt_autoencoder = encoder_tgt(all_histoire_fin_noise)
+                    pred_discriminator_tgt = discriminator.forward(z_tgt_autoencoder)
+                    pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
+                    adv_loss2 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
+                    if epoch == 1:
+                        y_src_eval= all_histoire_debut_noise
+                        y_tgt_eval = all_histoire_fin_noise
+                    else:
+                        encoder_src.train(False)
+                        decoder_src.train(False)
+                        encoder_tgt.train(False)
+                        decoder_tgt.train(False)
+                        y_tgt_eval = decoder_tgt(encoder_src(all_histoire_debut_embedding))
+                        y_src_eval = decoder_src(encoder_tgt(all_histoire_fin_embedding))
+                        encoder_src.train(True)
+                        decoder_src.train(True)
+                        encoder_tgt.train(True)
+                        decoder_tgt.train(True)
+                        #evaluate1
+                    z_src_cross=encoder_src(y_src_eval)
+                    pred_discriminator_src = discriminator.forward(z_src_cross)
+                    pred_discriminator_src = pred_discriminator_src.view(-1)
+                    adv_loss3 = criterion_adver(pred_discriminator_src, target_adver_src)
+                    # evaluate2
+                    z_tgt_cross = encoder_tgt(y_tgt_eval)
+                    pred_discriminator_tgt = discriminator.forward(z_tgt_cross)
+                    pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
+                    adv_loss4 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
+                    total_loss=adv_loss1+adv_loss2+adv_loss3+adv_loss4
+                    total_loss.backward()
+                    discriminator_optmizer.step()
                 accuracy_summary = tf.Summary()
                 main_loss_total=total_loss.item()
                 accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
@@ -146,12 +185,14 @@ class Script(DefaultScript):
                     plot_loss_total = 0
                     compteur_val += 1
                     if compteur_val == 3:
+                        compteur
                         compteur_val = 0
                         correct = 0
                         correctfin = 0
                         correctdebut = 0
                         total = 0
                         for num, batch in enumerate(generator_dev):
+                            compteur+=1
                             encoder_src.train(False)
                             decoder_src.train(False)
                             encoder_tgt.train(False)
@@ -196,7 +237,7 @@ class Script(DefaultScript):
                                                            simple_value=(correct / total))
                                 accuracy_summary.value.add(tag='val_accuracy_similitude',
                                                            simple_value=(correctfin / total))
-                                writer.add_summary(accuracy_summary, num + num_1 - 1)
+                                writer.add_summary(accuracy_summary,compteur)
                                 if num % self.config.plot_every_test == self.config.plot_every_test - 1:
                                     plot_acc_avg = correct / total
                                     if plot_acc_avg > max_acc:
