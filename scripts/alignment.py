@@ -138,7 +138,7 @@ class Script(DefaultScript):
 
         print("beginning training...")
 
-        for epoch in range(len(self.config.n_epochs)):
+        for epoch in range(self.config.n_epochs):
             for k in range(0, len(train_set), self.config.batch_size):
                 inputs, labels = next(generator_training)
                 # We train the frozen model and the unfrozen model jointly
