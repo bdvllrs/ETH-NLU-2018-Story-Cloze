@@ -6,6 +6,7 @@ from torch.autograd import Variable
 import torch
 import time
 import math
+import random
 from utils import Discriminator
 USE_CUDA = torch.cuda.is_available()
 import tensorflow as tf
@@ -52,6 +53,7 @@ class Script(DefaultScript):
         target_adver_src = Variable(torch.zeros(self.config.batch_size)).cuda()
         target_adver_tgt = Variable(torch.ones(self.config.batch_size)).cuda()
         plot_loss_total = 0
+        plot_loss_total_adv = 0
 
 
         compteur=0
@@ -64,7 +66,7 @@ class Script(DefaultScript):
                 all_histoire_fin_embedding = Variable(torch.FloatTensor(batch[1])).cuda()
                 all_histoire_debut_noise =Variable(torch.FloatTensor(batch[2])).cuda()
                 all_histoire_fin_noise = Variable(torch.FloatTensor(batch[3])).cuda()
-                if num%2==0:
+                if num_1%2==0:
                     encoder_optimizer_source.zero_grad()
                     decoder_optimizer_source.zero_grad()
                     encoder_optimizer_target.zero_grad()
@@ -115,20 +117,30 @@ class Script(DefaultScript):
                     decoder_optimizer_source.step()
                     encoder_optimizer_target.step()
                     decoder_optimizer_target.step()
-
+                    accuracy_summary = tf.Summary()
+                    main_loss_total=total_loss.item()
+                    accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
+                    writer.add_summary(accuracy_summary, num_1)
+                    plot_loss_total += main_loss_total
                 else:
                     #REDEFINIR lINPUT du DATASET
                     new_X=[]
                     new_Y_src=[]
                     new_Y_tgt=[]
-                    for num,batch in enumerate(all_histoire_debut_embedding):
+                    for num_3,batch_3 in enumerate(all_histoire_debut_embedding):
+
                         if random.random()>0.5:
-                            new_X.append(batch)
+
+                            new_X.append(batch_3.cpu().numpy())
                             new_Y_src.append(1)
-
+                            new_Y_tgt.append(0)
                         else:
-
-
+                            new_X.append(all_histoire_fin_embedding[num_3].cpu().numpy())
+                            new_Y_src.append(0)
+                            new_Y_tgt.append(1)
+                    all_histoire_debut_noise=Variable(torch.FloatTensor(np.array(new_X))).cuda()
+                    target_adver_src=Variable(torch.FloatTensor(np.array(new_Y_src))).cuda()
+                    target_adver_tgt=Variable(torch.FloatTensor(np.array(new_Y_tgt))).cuda()
                     discriminator_optmizer.zero_grad()
                     discriminator.train(True)
                     encoder_src.train(False)
@@ -139,7 +151,7 @@ class Script(DefaultScript):
                     pred_discriminator_src=discriminator.forward(z_src_autoencoder)
                     pred_discriminator_src = pred_discriminator_src.view(-1)
                     adv_loss1 = criterion_adver(pred_discriminator_src, target_adver_src)
-                    z_tgt_autoencoder = encoder_tgt(all_histoire_fin_noise)
+                    z_tgt_autoencoder = encoder_tgt(all_histoire_debut_noise)
                     pred_discriminator_tgt = discriminator.forward(z_tgt_autoencoder)
                     pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
                     adv_loss2 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
@@ -152,7 +164,7 @@ class Script(DefaultScript):
                         encoder_tgt.train(False)
                         decoder_tgt.train(False)
                         y_tgt_eval = decoder_tgt(encoder_src(all_histoire_debut_embedding))
-                        y_src_eval = decoder_src(encoder_tgt(all_histoire_fin_embedding))
+                        y_src_eval = decoder_src(encoder_tgt(all_histoire_debut_embedding))
                         encoder_src.train(True)
                         decoder_src.train(True)
                         encoder_tgt.train(True)
@@ -167,20 +179,21 @@ class Script(DefaultScript):
                     pred_discriminator_tgt = discriminator.forward(z_tgt_cross)
                     pred_discriminator_tgt = pred_discriminator_tgt.view(-1)
                     adv_loss4 = criterion_adver(pred_discriminator_tgt, target_adver_tgt)
-                    total_loss=adv_loss1+adv_loss2+adv_loss3+adv_loss4
-                    total_loss.backward()
+                    total_loss_adv=adv_loss1+adv_loss2+adv_loss3+adv_loss4
+                    total_loss_adv.backward()
                     discriminator_optmizer.step()
-                accuracy_summary = tf.Summary()
-                main_loss_total=total_loss.item()
-                accuracy_summary.value.add(tag='train_loss_main', simple_value=main_loss_total)
-                writer.add_summary(accuracy_summary, num_1)
-                plot_loss_total += main_loss_total
+                    accuracy_summary = tf.Summary()
+                    main_loss_total_adv=total_loss_adv.item()
+                    accuracy_summary.value.add(tag='train_loss_main_adv', simple_value=main_loss_total_adv)
+                    writer.add_summary(accuracy_summary, num_1)
+                    plot_loss_total_adv += main_loss_total_adv
                 if num_1 % self.config.plot_every == self.config.plot_every - 1:
                     plot_loss_avg = plot_loss_total / self.config.plot_every
-                    print_summary = '%s (%d %d%%) %.4f' % (
+                    plot_loss_avg_adv = plot_loss_total_adv / self.config.plot_every
+                    print_summary = '%s (%d %d%%) %.4f %.4f' % (
                     self.time_since(start, (num_1 + 1) / (90000 / 32)), (num_1 + 1),
                         (num_1 + 1) / (90000 / 32) * 100,
-                        plot_loss_avg)
+                        plot_loss_avg,plot_loss_avg_adv)
                     print(print_summary)
                     plot_loss_total = 0
                     compteur_val += 1
@@ -197,6 +210,7 @@ class Script(DefaultScript):
                             decoder_src.train(False)
                             encoder_tgt.train(False)
                             decoder_tgt.train(False)
+                            discriminator.train(False)
                             if num < 11:
                                 all_histoire_debut_embedding = Variable(torch.FloatTensor(batch[0]))
                                 all_histoire_fin_embedding1 = Variable(torch.FloatTensor(batch[1]))
