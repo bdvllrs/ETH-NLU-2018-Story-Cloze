@@ -150,7 +150,7 @@ class Script(DefaultScript):
             if not k % self.config.test_and_save_every:
                 test_metrics = []
                 for j, (inputs_val, labels_val) in enumerate(generator_dev):
-                    if j >= self.config.limit_test_step:
+                    if 0 < self.config.limit_test_step <= j:
                         break
                     test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
                 test_metrics = np.mean(test_metrics, axis=0)
