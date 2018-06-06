@@ -71,32 +71,14 @@ class Script(DefaultScript):
         self.sent2vec_model = sent2vec.Sent2vecModel()
         self.sent2vec_model.load_model(self.config.sent2vec.model)
 
-
         # Initialize tensorflow session
         sess = tf.Session()
         K.set_session(sess)  # Set to keras backend
-
-        # if self.config.debug:
-        #     print('Importing Elmo module...')
-        # if self.config.hub.is_set("cache_dir"):
-        #     os.environ['TFHUB_CACHE_DIR'] = self.config.hub.cache_dir
-        #
-        # elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
-        # if self.config.debug:
-        #     print('Imported.')
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.tables_initializer())
 
         self.graph = tf.get_default_graph()
-
-        # elmo_emb_fn = ElmoEmbedding(elmo_model)
-
-        # elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(1024,))
-        # sentence = keras.layers.Input(shape=(1,), dtype="string")
-        # sentence_emb = elmo_embeddings(sentence)
-
-        # self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
 
         print("Getting datasets")
 
@@ -150,12 +132,12 @@ class Script(DefaultScript):
                     metrics = frozen_model.train_on_batch(inputs, labels)
                     if not k % self.config.print_train_every:
                         print_on_tensorboard(writer, frozen_model.metrics_names, metrics,
-                                             epoch * len(train_set) / self.config.batch_size + k, 'train_f')
+                                             epoch * len(train_set) + k, 'train_f')
                 else:
                     metrics = model.train_on_batch(inputs, labels)
                     if not k % self.config.print_train_every:
                         print_on_tensorboard(writer, model.metrics_names, metrics,
-                                             epoch * len(train_set) / self.config.batch_size + k, 'train_uf')
+                                             epoch * len(train_set) + k, 'train_uf')
 
                 if not k % self.config.test_and_save_every:
                     test_metrics = []
@@ -167,7 +149,7 @@ class Script(DefaultScript):
                     test_metrics = np.mean(test_metrics, axis=0)
                     # Save value to tensorboard
                     print_on_tensorboard(writer, frozen_model.metrics_names, test_metrics,
-                                         epoch * len(train_set) / self.config.batch_size + k, 'test')
+                                         epoch * len(train_set) + k, 'test')
                     test_metrics_dict = get_dict_from_lists(frozen_model.metrics_names, test_metrics)
                     # We save the model is loss is better for generator
                     # We only want to save the generator model
