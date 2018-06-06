@@ -31,12 +31,6 @@ class Script(DefaultScript):
         if self.config.debug:
             print('Imported.')
 
-        # If we gave the models to the encoder decodes...
-        self.use_pretrained_models = self.config.alignment.is_set(
-                'decoder_target_model') and self.config.alignment.is_set(
-                'decoder_src_model') and self.config.alignment.is_set(
-                'encoder_target_model') and self.config.alignment.is_set('encoder_src_model')
-
         sess.run(tf.global_variables_initializer())
         sess.run(tf.tables_initializer())
 
@@ -59,48 +53,50 @@ class Script(DefaultScript):
 
         model = keras.models.load_model(self.config.alignment.final_model)
 
-        print(model.metrics_names)
-        acc_targets = []
-        acc_srcs = []
+        self.define_models()
+
+        hits = 0.
+        total = 0.
         for inputs, labels in generator_test:
-            results = model.evaluate(inputs, labels, batch_size=len(inputs))
-            acc_target, acc_src = results[-4], results[-5]
-            acc_targets.append(acc_target)
-            acc_srcs.append(acc_src)
-            print(np.mean(acc_targets), np.mean(acc_srcs))
+            discr_src, _ = model.predict(inputs, batch_size=self.config.batch_size)
+            for k, discr in enumerate(discr_src):
+                if discr < 0.5 and labels[0][k] == 0 or discr >= 0.5 and labels[0][k] == 1:  # predicts that the right one is left
+                    hits += 1.
+                total += 1.
+            print(hits/total)
 
     def train(self):
+        import sent2vec
+        assert self.config.sent2vec.model is not None, "Please add sent2vec_model config value."
+        self.sent2vec_model = sent2vec.Sent2vecModel()
+        self.sent2vec_model.load_model(self.config.sent2vec.model)
+
+
         # Initialize tensorflow session
         sess = tf.Session()
         K.set_session(sess)  # Set to keras backend
 
-        if self.config.debug:
-            print('Importing Elmo module...')
-        if self.config.hub.is_set("cache_dir"):
-            os.environ['TFHUB_CACHE_DIR'] = self.config.hub.cache_dir
-
-        elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
-        if self.config.debug:
-            print('Imported.')
-
-        # If we gave the models to the encoder decodes...
-        self.use_pretrained_models = self.config.alignment.is_set(
-                'decoder_target_model') and self.config.alignment.is_set(
-                'decoder_src_model') and self.config.alignment.is_set(
-                'encoder_target_model') and self.config.alignment.is_set('encoder_src_model')
+        # if self.config.debug:
+        #     print('Importing Elmo module...')
+        # if self.config.hub.is_set("cache_dir"):
+        #     os.environ['TFHUB_CACHE_DIR'] = self.config.hub.cache_dir
+        #
+        # elmo_model = hub.Module("https://tfhub.dev/google/elmo/1", trainable=True)
+        # if self.config.debug:
+        #     print('Imported.')
 
         sess.run(tf.global_variables_initializer())
         sess.run(tf.tables_initializer())
 
         self.graph = tf.get_default_graph()
 
-        elmo_emb_fn = ElmoEmbedding(elmo_model)
+        # elmo_emb_fn = ElmoEmbedding(elmo_model)
 
-        elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(1024,))
-        sentence = keras.layers.Input(shape=(1,), dtype="string")
-        sentence_emb = elmo_embeddings(sentence)
+        # elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(1024,))
+        # sentence = keras.layers.Input(shape=(1,), dtype="string")
+        # sentence_emb = elmo_embeddings(sentence)
 
-        self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
+        # self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
 
         print("Getting datasets")
 
@@ -277,11 +273,11 @@ class Script(DefaultScript):
         return model
 
     def build_frozen_graph(self):
-        input_src_ori = Input((1024,))  # src sentence (only last sentence of story)
-        input_src_noise_ori = Input((1024,))  # Noise on src sentence
-        input_target = Input((1024,))  # Noise on target sentence
-        input_target_noise = Input((1024,))  # Noise on target sentence
-        history_ref_ori = Input((1024,))  # Target of the story
+        input_src_ori = Input((1024,), name="input_src_ori")  # src sentence (only last sentence of story)
+        input_src_noise_ori = Input((1024,), name="input_src_noise_ori")  # Noise on src sentence
+        input_target = Input((1024,), name="input_target")  # Noise on target sentence
+        input_target_noise = Input((1024,), name="input_target_noise")  # Noise on target sentence
+        history_ref_ori = Input((1024,), name="history_ref_ori")  # Target of the story
 
         input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
 
@@ -300,7 +296,7 @@ class Script(DefaultScript):
                         src_aligned))  # 0 src and from src_enc or target_aligned and from target_enc, 1 otherwise
         discriminator_target = Lambda(lambda x: x, name="disrc_target")(self.discriminator(target_aligned))
 
-        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target, input_target_noise, history_ref_ori],
+        model = Model(inputs=[input_src_noise_ori, input_target_noise, history_ref_ori],
                       outputs=[discriminator_src, discriminator_target])
         model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy", ['accuracy'])
 
@@ -341,9 +337,10 @@ class Script(DefaultScript):
         return new_variable[0, 0]
 
     def embedding(self, x):
-        with self.graph.as_default():
-            result = self.elmo_model.predict(x, batch_size=len(x))
-        return result
+        sentences = []
+        for sentence in x:
+            sentences.append(self.sent2vec_model.embed_sentence(sentence))
+        return np.array(sentences)
 
     def output_fn_snli(self, _, batch):
         all_stories_beg_embedded = []
@@ -453,27 +450,23 @@ class Script(DefaultScript):
             # 1 if beginning = target = false sentence
             label1.append(label)
             label2.append(1 - label)
-        all_stories_end_embedded = self.embedding(np.array(all_stories_end_embedded))
-        all_stories_beg_embedded = self.embedding(np.array(all_stories_beg_embedded))
         all_stories_noise_end = self.embedding(np.array(all_stories_noise_end))
         all_stories_noise_beg = self.embedding(np.array(all_stories_noise_beg))
         all_history_ref_embedding = self.embedding(np.array(all_history_ref))
         label1 = np.array(label1)
         label2 = np.array(label2)
-        return [all_stories_beg_embedded,
-                all_stories_noise_beg,
-                all_stories_end_embedded,
+        return [all_stories_noise_beg,
                 all_stories_noise_end, all_history_ref_embedding], [label1, label2]
 
 
-class ElmoEmbedding:
-    def __init__(self, elmo_model):
-        self.elmo_model = elmo_model
-        self.__name__ = "elmo_embeddings"
-
-    def __call__(self, x):
-        return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
-            "default"]
+# class ElmoEmbedding:
+#     def __init__(self, elmo_model):
+#         self.elmo_model = elmo_model
+#         self.__name__ = "elmo_embeddings"
+#
+#     def __call__(self, x):
+#         return self.elmo_model(tf.squeeze(tf.cast(x, tf.string)), signature="default", as_dict=True)[
+#             "default"]
 
 
 def preprocess_fn(line):
