@@ -151,7 +151,7 @@ def main(config):
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=1,
+    keras_model.fit_generator(generator_training, steps_per_epoch=300,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
