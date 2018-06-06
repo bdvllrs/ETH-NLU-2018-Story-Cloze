@@ -36,13 +36,13 @@ class Script(DefaultScript):
 
         self.graph = tf.get_default_graph()
 
-        elmo_emb_fn = ElmoEmbedding(elmo_model)
-
-        elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(1024,))
-        sentence = keras.layers.Input(shape=(1,), dtype="string")
-        sentence_emb = elmo_embeddings(sentence)
-
-        self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
+        # elmo_emb_fn = ElmoEmbedding(elmo_model)
+        #
+        # elmo_embeddings = keras.layers.Lambda(elmo_emb_fn, output_shape=(1024,))
+        # sentence = keras.layers.Input(shape=(1,), dtype="string")
+        # sentence_emb = elmo_embeddings(sentence)
+        #
+        # self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
 
         test_set = Dataloader(self.config, 'data/test_stories.csv', testing_data=True)
         test_set.load_dataset('data/test.bin')
@@ -122,10 +122,9 @@ class Script(DefaultScript):
         print("beginning training...")
 
         for epoch in range(self.config.n_epochs):
+            self.use_frozen = not self.use_frozen
 
             for k in range(0, len(train_set), self.config.batch_size):
-
-                self.use_frozen = not self.use_frozen
 
                 inputs, labels = next(generator_training)
                 # We train the frozen model and the unfrozen model jointly
@@ -215,6 +214,11 @@ class Script(DefaultScript):
         input_src = keras.layers.concatenate([input_src_ori, history_ref_ori])
         input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
 
+        self.encoder_src_model.trainable = True
+        self.encoder_target_model.trainable = True
+        self.decoder_src_model.trainable = True
+        self.decoder_target_model.trainable = True
+
         # Build graph
         src_aligned = self.encoder_src_model(input_src_noise)
         out_src = self.decoder_src_model(src_aligned)  # Must be equal to input_src
@@ -257,9 +261,7 @@ class Script(DefaultScript):
         return model
 
     def build_frozen_graph(self):
-        input_src_ori = Input((1024,), name="input_src_ori")  # src sentence (only last sentence of story)
         input_src_noise_ori = Input((1024,), name="input_src_noise_ori")  # Noise on src sentence
-        input_target = Input((1024,), name="input_target")  # Noise on target sentence
         input_target_noise = Input((1024,), name="input_target_noise")  # Noise on target sentence
         history_ref_ori = Input((1024,), name="history_ref_ori")  # Target of the story
 
