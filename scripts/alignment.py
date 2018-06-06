@@ -145,10 +145,13 @@ class Script(DefaultScript):
                     print_on_tensorboard(writer, model.metrics_names, metrics, k, 'train_uf')
 
             self.use_frozen = not self.use_frozen
+            print(k, k % self.config.test_and_save_every, not k % self.config.test_and_save_every)
 
-            if k > 0 and not k % self.config.test_and_save_every:
+            if not k % self.config.test_and_save_every:
                 test_metrics = []
                 for j, (inputs_val, labels_val) in enumerate(generator_dev):
+                    if j >= self.config.limit_test_step:
+                        break
                     test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
                 test_metrics = np.mean(test_metrics, axis=0)
                 # Save value to tensorboard
@@ -514,11 +517,13 @@ def print_on_tensorboard(writer, metrics, results, k, prefix=""):
     :param k: x axis
     :param prefix: prefix to add the names
     """
+    print("Saving on tensorboard...")
     # Save value to tensorboard
     accuracy_summary = tf.Summary()
     for name, value in zip(metrics, results):
         accuracy_summary.value.add(tag=prefix + "_" + name, simple_value=value)
     writer.add_summary(accuracy_summary, k)
+    print("Saved.")
 
 
 def get_dict_from_lists(keys, values):
