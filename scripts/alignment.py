@@ -138,38 +138,40 @@ class Script(DefaultScript):
 
         print("beginning training...")
 
-        for k, (inputs, labels) in enumerate(generator_training):
-            # We train the frozen model and the unfrozen model jointly
-            if self.use_frozen:
-                # Generator training
-                metrics = frozen_model.train_on_batch(inputs, labels)
-                if not k % self.config.print_train_every:
-                    print_on_tensorboard(writer, frozen_model.metrics_names, metrics, k, 'train_f')
-            else:
-                metrics = model.train_on_batch(inputs, labels)
-                if not k % self.config.print_train_every:
-                    print_on_tensorboard(writer, model.metrics_names, metrics, k, 'train_uf')
+        for epoch in range(len(self.config.n_epochs)):
+            for k in range(0, len(train_set), self.config.batch_size):
+                inputs, labels = next(generator_training)
+                # We train the frozen model and the unfrozen model jointly
+                if self.use_frozen:
+                    # Generator training
+                    metrics = frozen_model.train_on_batch(inputs, labels)
+                    if not k % self.config.print_train_every:
+                        print_on_tensorboard(writer, frozen_model.metrics_names, metrics, k, 'train_f')
+                else:
+                    metrics = model.train_on_batch(inputs, labels)
+                    if not k % self.config.print_train_every:
+                        print_on_tensorboard(writer, model.metrics_names, metrics, k, 'train_uf')
 
-            self.use_frozen = not self.use_frozen
-            print(k, k % self.config.test_and_save_every, not k % self.config.test_and_save_every)
+                self.use_frozen = not self.use_frozen
 
-            if not k % self.config.test_and_save_every:
-                test_metrics = []
-                for j, (inputs_val, labels_val) in enumerate(generator_dev):
-                    if 0 < self.config.limit_test_step <= j:
-                        break
-                    test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
-                test_metrics = np.mean(test_metrics, axis=0)
-                # Save value to tensorboard
-                print_on_tensorboard(writer, frozen_model.metrics_names, test_metrics, k, 'test')
-                test_metrics_dict = get_dict_from_lists(frozen_model.metrics_names, test_metrics)
-                # We save the model is loss is better for generator
-                # We only want to save the generator model
-                if min_source_loss is None or test_metrics_dict['disrc_src_loss'] < min_source_loss:
-                    frozen_model.save(model_path + str(k) + ".hdf5")
-                    if last_created_file is not None:
-                        os.remove(last_created_file)  # Only keep the best one
-                    last_created_file = model_path + str(k) + ".hdf5"
+                if not k % self.config.test_and_save_every:
+                    test_metrics = []
+                    for j in range(0, len(test_set), self.config.batch_size):
+                        inputs_val, labels_val = next(generator_dev)
+                        if 0 < self.config.limit_test_step <= j:
+                            break
+                        test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
+                    test_metrics = np.mean(test_metrics, axis=0)
+                    # Save value to tensorboard
+                    print_on_tensorboard(writer, frozen_model.metrics_names, test_metrics, k, 'test')
+                    test_metrics_dict = get_dict_from_lists(frozen_model.metrics_names, test_metrics)
+                    # We save the model is loss is better for generator
+                    # We only want to save the generator model
+                    if min_source_loss is None or test_metrics_dict['disrc_src_loss'] < min_source_loss:
+                        frozen_model.save(model_path + str(k) + ".hdf5")
+                        if last_created_file is not None:
+                            os.remove(last_created_file)  # Only keep the best one
+                        last_created_file = model_path + str(k) + ".hdf5"
 
     def define_models(self):
         # Decoder target
