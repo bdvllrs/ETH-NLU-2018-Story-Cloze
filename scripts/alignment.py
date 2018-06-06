@@ -122,9 +122,11 @@ class Script(DefaultScript):
         print("beginning training...")
 
         for epoch in range(self.config.n_epochs):
-            self.use_frozen = not self.use_frozen
 
             for k in range(0, len(train_set), self.config.batch_size):
+
+                self.use_frozen = not self.use_frozen
+
                 inputs, labels = next(generator_training)
                 # We train the frozen model and the unfrozen model jointly
                 if self.use_frozen:
@@ -398,8 +400,8 @@ class Script(DefaultScript):
         if self.use_frozen:  # We switched up the sources and targets
             ones = np.ones(len(batch))
             # disriminator must be one because inverted
-            return [all_stories_beg_embedded, all_stories_noise_beg,
-                    all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [ones, ones]
+            return [all_stories_noise_beg,
+                    all_stories_noise_end, all_history_ref_embedding], [ones, ones]
         zeros = np.zeros(len(batch))
         return [all_stories_beg_embedded, all_stories_noise_beg,
                 all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [zeros, zeros, zeros]
@@ -484,13 +486,11 @@ def print_on_tensorboard(writer, metrics, results, k, prefix=""):
     :param k: x axis
     :param prefix: prefix to add the names
     """
-    print("Saving on tensorboard...")
     # Save value to tensorboard
     accuracy_summary = tf.Summary()
     for name, value in zip(metrics, results):
         accuracy_summary.value.add(tag=prefix + "_" + name, simple_value=value)
     writer.add_summary(accuracy_summary, k)
-    print("Saved.")
 
 
 def get_dict_from_lists(keys, values):
