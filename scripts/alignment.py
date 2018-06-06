@@ -151,11 +151,13 @@ class Script(DefaultScript):
                     # Generator training
                     metrics = frozen_model.train_on_batch(inputs, labels)
                     if not k % self.config.print_train_every:
-                        print_on_tensorboard(writer, frozen_model.metrics_names, metrics, k, 'train_f')
+                        print_on_tensorboard(writer, frozen_model.metrics_names, metrics,
+                                             epoch * len(train_set) / self.config.batch_size + k, 'train_f')
                 else:
                     metrics = model.train_on_batch(inputs, labels)
                     if not k % self.config.print_train_every:
-                        print_on_tensorboard(writer, model.metrics_names, metrics, k, 'train_uf')
+                        print_on_tensorboard(writer, model.metrics_names, metrics,
+                                             epoch * len(train_set) / self.config.batch_size + k, 'train_uf')
 
                 self.use_frozen = not self.use_frozen
 
@@ -168,7 +170,8 @@ class Script(DefaultScript):
                         test_metrics.append(frozen_model.test_on_batch(inputs_val, labels_val))
                     test_metrics = np.mean(test_metrics, axis=0)
                     # Save value to tensorboard
-                    print_on_tensorboard(writer, frozen_model.metrics_names, test_metrics, k, 'test')
+                    print_on_tensorboard(writer, frozen_model.metrics_names, test_metrics,
+                                         epoch * len(train_set) / self.config.batch_size + k, 'test')
                     test_metrics_dict = get_dict_from_lists(frozen_model.metrics_names, test_metrics)
                     # We save the model is loss is better for generator
                     # We only want to save the generator model
