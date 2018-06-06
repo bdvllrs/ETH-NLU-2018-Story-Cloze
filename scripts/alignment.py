@@ -472,9 +472,9 @@ class EncoderDecoder:
         l1 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer1(x))))
         if self.layer3 is not None:
             l2 = BatchNormalization()(Dropout(0.3)(LeakyReLU()(self.layer2(l1))))
-            return BatchNormalization()(self.layer3(l2))
+            return self.layer3(l2)
         else:
-            return BatchNormalization()(self.layer2(l1))
+            return self.layer2(l1)
 
 
 def print_on_tensorboard(writer, metrics, results, k, prefix=""):
