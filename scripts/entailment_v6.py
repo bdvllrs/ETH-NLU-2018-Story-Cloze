@@ -21,7 +21,7 @@ from scripts import DefaultScript
 
 class Script(DefaultScript):
 
-    slug = 'entailment_v5'
+    slug = 'entailment_v6'
 
     def train(self):
         main(self.config)
@@ -32,35 +32,6 @@ class Script(DefaultScript):
     #
     #     testing_set.load_vocab('data/default.voc', self.config.vocab_size)
     #     test(self.config, testing_set)
-
-
-class Preprocess:
-    def __init__(self, sent2vec):
-        self.sent2vec = sent2vec
-
-    def __call__(self, line):
-        # label = [entailment, neutral, contradiction]
-        sentence1 = list(self.sent2vec.embed_sentence(' '.join(word_tokenize(line['sentence1']))))
-        sentence2 = list(self.sent2vec.embed_sentence(' '.join(word_tokenize(line['sentence2']))))
-        return sentence1, sentence2
-
-
-def output_fn(_, batch):
-    labels = []
-    sentence1 = []
-    sentence2 = []
-    sentence3 = []
-    for b in range(len(batch)):
-        sentence1.append(batch[b][0][0])
-        if random.random() > 0.5:
-            sentence2.append(batch[b][0][1])
-            sentence3.append(batch[b][1][1])
-            labels.append(0)
-        else:
-            sentence2.append(batch[b][1][1])
-            sentence3.append(batch[b][0][1])
-            labels.append(1)
-    return [np.array(sentence1), np.array(sentence2), np.array(sentence3)], np.array(labels)
 
 
 class OutputFnTest:
@@ -113,13 +84,12 @@ def main(config):
     sent2vec_model = sent2vec.Sent2vecModel()
     sent2vec_model.load_model(config.sent2vec.model)
 
-    preprocess_fn = Preprocess(sent2vec_model)
-
     output_fn_test = OutputFnTest(sent2vec_model, config)
 
-    train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
-    train_set.set_preprocess_fn(preprocess_fn)
-    train_set.set_output_fn(output_fn)
+    train_set = Dataloader(config, 'data/dev_stories.csv', testing_data=True)
+    train_set.load_dataset('data/dev.bin')
+    train_set.load_vocab('./data/default.voc', config.vocab_size)
+    train_set.set_output_fn(output_fn_test)
 
     test_set = Dataloader(config, 'data/test_stories.csv', testing_data=True)
     test_set.load_dataset('data/test.bin')
@@ -138,19 +108,19 @@ def main(config):
     verbose = 0 if not config.debug else 1
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Callbacks
-    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv5/', histogram_freq=0,
+    tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-entailmentv6/', histogram_freq=0,
                                               batch_size=config.batch_size,
                                               write_graph=False,
                                               write_grads=True)
 
     model_path = os.path.abspath(
         os.path.join(os.curdir, './builds/' + timestamp))
-    model_path += '-entailmentv5_checkpoint_epoch-{epoch:02d}.hdf5'
+    model_path += '-entailmentv6_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
                                             monitor='val_loss', verbose=verbose, save_best_only=True)
 
-    keras_model.fit_generator(generator_training, steps_per_epoch=300,
+    keras_model.fit_generator(generator_training, steps_per_epoch=5,
                               epochs=config.n_epochs,
                               verbose=verbose,
                               validation_data=generator_dev,
