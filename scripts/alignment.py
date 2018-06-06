@@ -10,7 +10,7 @@ import numpy as np
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout, LeakyReLU, BatchNormalization, Lambda
 
-from utils import Dataloader, SNLIDataloaderPairs
+from utils import Dataloader
 from scripts import DefaultScript
 
 
@@ -138,12 +138,14 @@ class Script(DefaultScript):
 
         last_created_file = None
 
-        self.use_frozen = False
+        self.use_frozen = True
         min_source_loss = None
 
         print("beginning training...")
 
         for epoch in range(self.config.n_epochs):
+            self.use_frozen = not self.use_frozen
+
             for k in range(0, len(train_set), self.config.batch_size):
                 inputs, labels = next(generator_training)
                 # We train the frozen model and the unfrozen model jointly
@@ -158,8 +160,6 @@ class Script(DefaultScript):
                     if not k % self.config.print_train_every:
                         print_on_tensorboard(writer, model.metrics_names, metrics,
                                              epoch * len(train_set) / self.config.batch_size + k, 'train_uf')
-
-                self.use_frozen = not self.use_frozen
 
                 if not k % self.config.test_and_save_every:
                     test_metrics = []
