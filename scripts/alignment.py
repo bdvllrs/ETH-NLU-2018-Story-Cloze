@@ -104,9 +104,14 @@ class Script(DefaultScript):
 
         print("Getting datasets")
 
-        train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
-        train_set.set_preprocess_fn(preprocess_fn)
-        train_set.load_vocab('./data/snli_vocab.dat', self.config.vocab_size)
+        # train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
+        # train_set.set_preprocess_fn(preprocess_fn)
+        # train_set.load_vocab('./data/snli_vocab.dat', self.config.vocab_size)
+        # train_set.set_output_fn(self.output_fn_snli)
+
+        train_set = Dataloader(self.config, './data/dev_stories.csv', testing_data=True)
+        train_set.load_dataset('./data/dev.bin')
+        train_set.load_vocab('./data/default.voc', self.config.vocab_size)
         train_set.set_output_fn(self.output_fn)
 
         test_set = Dataloader(self.config, 'data/test_stories.csv', testing_data=True)
@@ -176,11 +181,11 @@ class Script(DefaultScript):
     def define_models(self):
         # Decoder target
         input_target_decoder = Input((4096,))
-        layer_1_target_decoder = Dense(4096)
-        layer_2_target_decoder = Dense(2048, activation="relu")
+        layer_1_target_decoder = Dense(2048)
+        layer_2_target_decoder = Dense(1024, activation="relu")
         dec_target = EncoderDecoder(layer_1_target_decoder, layer_2_target_decoder)
         self.decoder_target_model = Model(input_target_decoder, dec_target(input_target_decoder))
-        self.decoder_target_model.compile("adam", "binary_crossentropy")
+        self.decoder_target_model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy")
 
         # Encoder src
         input_src_encoder = Input((2048,))
@@ -188,7 +193,7 @@ class Script(DefaultScript):
         layer_2_src_encoder = Dense(4096, activation="relu")
         encoder_src = EncoderDecoder(layer_1_src_encoder, layer_2_src_encoder)
         self.encoder_src_model = Model(input_src_encoder, encoder_src(input_src_encoder))
-        self.encoder_src_model.compile("adam", "binary_crossentropy")
+        self.encoder_src_model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy")
 
         # Decoder src
         input_src_decoder = Input((4096,))
@@ -196,15 +201,15 @@ class Script(DefaultScript):
         layer_2_src_decoder = Dense(2048, activation="relu")
         decoder_src = EncoderDecoder(layer_1_src_decoder, layer_2_src_decoder)
         self.decoder_src_model = Model(input_src_decoder, decoder_src(input_src_decoder))
-        self.decoder_src_model.compile("adam", "binary_crossentropy")
+        self.decoder_src_model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy")
 
         # Encoder target
-        input_target_encoder = Input((2048,))
+        input_target_encoder = Input((1024,))
         layer_1_target_encoder = Dense(2048)
         layer_2_target_encoder = Dense(4096, activation="relu")
         encoder_target = EncoderDecoder(layer_1_target_encoder, layer_2_target_encoder)
         self.encoder_target_model = Model(input_target_encoder, encoder_target(input_target_encoder))
-        self.encoder_target_model.compile("adam", "binary_crossentropy")
+        self.encoder_target_model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy")
 
         # Discriminator
         input_discriminator = Input((4096,))
@@ -213,86 +218,69 @@ class Script(DefaultScript):
         layer_3_discriminator = Dense(1, activation="sigmoid", name="discr_layer3")
         discriminator = EncoderDecoder(layer_1_discriminator, layer_2_discriminator, layer_3_discriminator,
                                        name="discriminator")
+
         self.discriminator = Model(input_discriminator, discriminator(input_discriminator))
-        self.discriminator.compile("adam", "binary_crossentropy")
+        self.discriminator.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy")
 
     def build_graph(self):
         input_src_ori = Input((1024,))  # src sentence (only last sentence of story)
         input_src_noise_ori = Input((1024,))  # Noise on src sentence
-        input_target_ori = Input((1024,))  # Noise on target sentence
-        input_target_noise_ori = Input((1024,))  # Noise on target sentence
+        input_target = Input((1024,))  # Noise on target sentence
+        input_target_noise = Input((1024,))  # Noise on target sentence
         history_ref_ori = Input((1024,))  # Target of the story
 
         input_src = keras.layers.concatenate([input_src_ori, history_ref_ori])
         input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
-        input_target_noise = keras.layers.concatenate([input_target_noise_ori, history_ref_ori])
-        input_target = keras.layers.concatenate([input_target_ori, history_ref_ori])
 
         # Build graph
-        src = self.encoder_src_model(input_src_noise)
-        out_src = self.decoder_src_model(src)  # Must be equal to input_src
+        src_aligned = self.encoder_src_model(input_src_noise)
+        out_src = self.decoder_src_model(src_aligned)  # Must be equal to input_src
+        out_target_from_src = self.decoder_target_model(src_aligned)
 
-        target = self.encoder_target_model(input_target_noise)
-        out_target = self.decoder_target_model(target)  # Must be equal to input_target
+        target_aligned = self.encoder_target_model(input_target_noise)
+        out_target = self.decoder_target_model(target_aligned)  # Must be equal to input_target
+        out_src_from_target = self.decoder_src_model(target_aligned)
 
         discriminator_src = Lambda(lambda x: x, name="disrc_src")(
-                self.discriminator(src))  # 0 src annd from src_enc or target and from target_enc, 1 otherwise
-        discriminator_target = Lambda(lambda x: x, name="disrc_target")(self.discriminator(target))
+                self.discriminator(
+                        src_aligned))  # 0 src and from src_enc or target_aligned and from target_enc, 1 otherwise
+        discriminator_target = Lambda(lambda x: x, name="disrc_target")(self.discriminator(target_aligned))
 
         # Calculate differences
+        # Encoder decoder source
         diff_out_src_input_src = keras.layers.subtract([out_src, input_src])
-        diff_out_target_input_target = keras.layers.subtract([out_target, input_target])
-
         dist_src = keras.layers.dot([diff_out_src_input_src, diff_out_src_input_src], axes=1, name="dist_src")
-        dist_target = keras.layers.dot([diff_out_target_input_target, diff_out_target_input_target], axes=1,
+
+        # Encoder decoder target
+        diff_out_target = keras.layers.subtract([out_target, input_target])
+        dist_target = keras.layers.dot([diff_out_target, diff_out_target], axes=1,
                                        name="dist_target")
+        # Encoder source Decoder target
+        diff_out_target_from_source = keras.layers.subtract([out_target_from_src, input_target])
+        dist_target_from_source = keras.layers.dot([diff_out_target_from_source, diff_out_target_from_source], axes=1,
+                                                   name="dist_target_from_source")
 
-        # Get pretrained non trainable encoders & decoders
-        encoder_src_ntrainable = self.encoder_src(self.encoder_src_model)
-        encoder_target_ntrainable = self.encoder_target(self.encoder_target_model)
-        decoder_target_ntrainable = self.decoder_target(self.decoder_target_model)
-        decoder_src_ntrainable = self.decoder_src(self.decoder_src_model)
+        # Encoder target Decoder source
+        diff_out_src_from_target = keras.layers.subtract([out_src_from_target, out_src_from_target])
+        dist_src_from_target = keras.layers.dot([diff_out_src_from_target, diff_out_src_from_target], axes=1,
+                                                name="dist_source_from_target")
 
-        out_nn_target = decoder_target_ntrainable(encoder_src_ntrainable(input_src))  # Without noise
-        out_nn_src = decoder_src_ntrainable(encoder_target_ntrainable(input_target))
+        total_distance = keras.layers.add([dist_src, dist_target, dist_target_from_source, dist_src_from_target],
+                                          name="distances")
 
-        out_mix_target_enc = self.encoder_src_model(out_nn_src)
-        out_mix_source_enc = self.encoder_target_model(out_nn_target)
-
-        out_mix_target = self.decoder_target_model(out_mix_target_enc)
-        out_mix_src = self.decoder_src_model(out_mix_source_enc)  # Must be equal to input_src
-
-        discriminator_target_mix = self.discriminator(out_mix_target_enc)  # Needs to be 0
-        discriminator_src_mix = self.discriminator(out_mix_source_enc)
-
-        diff_out_mix_src_input_src = keras.layers.subtract([input_src, out_mix_src])
-        diff_out_mix_target_input_target = keras.layers.subtract([input_target, out_mix_target])
-
-        dist_mix_input_src = keras.layers.dot([diff_out_mix_src_input_src, diff_out_mix_src_input_src], axes=1,
-                                              name="dist_mix_input_src")
-        dist_mix_target_input_src = keras.layers.dot(
-                [diff_out_mix_target_input_target, diff_out_mix_target_input_target], axes=1,
-                name="dist_mix_target_input_src")
-
-        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target_ori, input_target_noise_ori, history_ref_ori],
-                      outputs=[dist_mix_input_src, dist_mix_target_input_src, dist_src, dist_target,
-                               discriminator_src, discriminator_target, discriminator_target_mix,
-                               discriminator_src_mix])
-        model.compile("adam", "binary_crossentropy", ['accuracy'])
+        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target, input_target_noise, history_ref_ori],
+                      outputs=[total_distance, discriminator_src, discriminator_target])
+        model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy", ['accuracy'])
         return model
 
     def build_frozen_graph(self):
         input_src_ori = Input((1024,))  # src sentence (only last sentence of story)
         input_src_noise_ori = Input((1024,))  # Noise on src sentence
-        input_target_ori = Input((1024,))  # Noise on target sentence
-        input_target_noise_ori = Input((1024,))  # Noise on target sentence
+        input_target = Input((1024,))  # Noise on target sentence
+        input_target_noise = Input((1024,))  # Noise on target sentence
         history_ref_ori = Input((1024,))  # Target of the story
 
-        input_src = keras.layers.concatenate([input_src_ori, history_ref_ori])
         input_src_noise = keras.layers.concatenate([input_src_noise_ori, history_ref_ori])
-        input_target_noise = keras.layers.concatenate([input_target_noise_ori, history_ref_ori])
-        input_target = keras.layers.concatenate([input_target_ori, history_ref_ori])
-
 
         self.encoder_src_model.trainable = False
         self.encoder_target_model.trainable = False
@@ -300,69 +288,23 @@ class Script(DefaultScript):
         self.decoder_target_model.trainable = False
 
         # Build graph
-        src = self.encoder_src_model(input_src_noise)
+        src_aligned = self.encoder_src_model(input_src_noise)
 
-        target = self.encoder_target_model(input_target_noise)
+        target_aligned = self.encoder_target_model(input_target_noise)
 
         discriminator_src = Lambda(lambda x: x, name="disrc_src")(
-                self.discriminator(src))  # 0 src = true sentence, 1 target = wrong
-        discriminator_target = Lambda(lambda x: x, name="disrc_target")(self.discriminator(target))
+                self.discriminator(
+                        src_aligned))  # 0 src and from src_enc or target_aligned and from target_enc, 1 otherwise
+        discriminator_target = Lambda(lambda x: x, name="disrc_target")(self.discriminator(target_aligned))
 
-        # Get pretrained non trainable encoders & decoders
-        encoder_src_ntrainable = self.encoder_src(self.encoder_src_model)
-        encoder_target_ntrainable = self.encoder_target(self.encoder_target_model)
-        decoder_target_ntrainable = self.decoder_target(self.decoder_target_model)
-        decoder_src_ntrainable = self.decoder_src(self.decoder_src_model)
+        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target, input_target_noise, history_ref_ori],
+                      outputs=[discriminator_src, discriminator_target])
+        model.compile(keras.optimizers.Adam(lr=self.config.learning_rate), "binary_crossentropy", ['accuracy'])
 
-        out_nn_target = decoder_target_ntrainable(encoder_src_ntrainable(input_src))  # Without noise
-        out_nn_src = decoder_src_ntrainable(encoder_target_ntrainable(input_target))
-
-        out_mix_target_enc = self.encoder_src_model(out_nn_src)
-        out_mix_source_enc = self.encoder_target_model(out_nn_target)
-
-        discriminator_target_mix = self.discriminator(out_mix_target_enc)  # Needs to be 0
-        discriminator_src_mix = self.discriminator(out_mix_source_enc)
-
-        model = Model(inputs=[input_src_ori, input_src_noise_ori, input_target_ori, input_target_noise_ori, history_ref_ori],
-                      outputs=[discriminator_src, discriminator_target, discriminator_target_mix,
-                               discriminator_src_mix])
-        model.compile("adam", "binary_crossentropy", ['accuracy'])
-        return model
-
-    def decoder_target(self, decoder):
-        inp = Input((4096,))
-        decoder.trainable = False
-        out = decoder(inp)
-        model = Model(inp, out)
-        model.compile("adam", "binary_crossentropy")
-        decoder.trainable = True
-        return model
-
-    def decoder_src(self, decoder):
-        inp = Input((4096,))
-        decoder.trainable = False
-        out = decoder(inp)
-        model = Model(inp, out)
-        model.compile("adam", "binary_crossentropy")
-        decoder.trainable = True
-        return model
-
-    def encoder_src(self, encoder):
-        inp = Input((2048,))
-        encoder.trainable = False
-        out = encoder(inp)
-        model = Model(inp, out)
-        model.compile("adam", "binary_crossentropy")
-        encoder.trainable = True
-        return model
-
-    def encoder_target(self, encoder):
-        inp = Input((2048,))
-        encoder.trainable = False
-        out = encoder(inp)
-        model = Model(inp, out)
-        model.compile("adam", "binary_crossentropy")
-        encoder.trainable = True
+        self.encoder_src_model.trainable = True
+        self.encoder_target_model.trainable = True
+        self.decoder_src_model.trainable = True
+        self.decoder_target_model.trainable = True
         return model
 
     def add_noise(self, variable, drop_probability: float = 0.1, shuffle_max_distance: int = 3):
@@ -377,22 +319,22 @@ class Script(DefaultScript):
         def perm(i):
             return i[0] + (shuffle_max_distance + 1) * np.random.random()
 
-        liste = []
+        sequences = []
         for b in range(variable.shape[0]):
             sequence = variable[b]
-            if (type(sequence) != list):
+            if type(sequence) != list:
                 sequence = sequence.tolist()
             sequence, reminder = sequence[:-1], sequence[-1:]
             if len(sequence) != 0:
-                compteur = 0
+                counter = 0
                 for num, val in enumerate(np.random.random_sample(len(sequence))):
                     if val < drop_probability:
-                        sequence.pop(num - compteur)
-                        compteur = compteur + 1
+                        sequence.pop(num - counter)
+                        counter = counter + 1
                 sequence = [x for _, x in sorted(enumerate(sequence), key=perm)]
             sequence = np.concatenate((sequence, reminder), axis=0)
-            liste.append(sequence)
-        new_variable = np.array(liste)
+            sequences.append(sequence)
+        new_variable = np.array(sequences)
         return new_variable[0, 0]
 
     def embedding(self, x):
@@ -400,46 +342,85 @@ class Script(DefaultScript):
             result = self.elmo_model.predict(x, batch_size=len(x))
         return result
 
-    def output_fn(self, _, batch):
-        all_histoire_debut_embedding = []
-        all_histoire_fin_embedding = []
-        all_histoire_noise_debut = []
-        all_histoire_noise_fin = []
+    def output_fn_snli(self, _, batch):
+        all_stories_beg_embedded = []
+        all_stories_end_embedded = []
+        all_stories_noise_beg = []
+        all_stories_noise_end = []
         all_history_ref = []
         for b in batch:
-            history_ref = b[0][0]
-            histoire_debut = b[0][1]
-            histoire_noise_debut = self.add_noise(histoire_debut)
-            histoire_fin = b[1][1]
-            histoire_noise_fin = self.add_noise(histoire_fin)
-            all_history_ref.append(history_ref)
+            story_ref = b[0][0]
+            story_beg = b[0][1]
+            story_noise_beg = self.add_noise(story_beg)
+            story_end = b[1][1]
+            story_noise_end = self.add_noise(story_end)
+            all_history_ref.append(story_ref)
             if not self.use_frozen:  # We send the real values
-                all_histoire_fin_embedding.append(histoire_fin)
-                all_histoire_noise_debut.append(histoire_noise_debut)
-                all_histoire_noise_fin.append(histoire_noise_fin)
-                all_histoire_debut_embedding.append(histoire_debut)
+                all_stories_end_embedded.append(story_end)
+                all_stories_noise_beg.append(story_noise_beg)
+                all_stories_noise_end.append(story_noise_end)
+                all_stories_beg_embedded.append(story_beg)
             else:  # We mix them up
-                all_histoire_fin_embedding.append(histoire_debut)
-                all_histoire_noise_debut.append(histoire_noise_fin)
-                all_histoire_noise_fin.append(histoire_noise_debut)
-                all_histoire_debut_embedding.append(histoire_fin)
-        all_histoire_fin_embedding = self.embedding(np.array(all_histoire_fin_embedding))
-        all_histoire_debut_embedding = self.embedding(np.array(all_histoire_debut_embedding))
-        all_histoire_noise_fin = self.embedding(np.array(all_histoire_noise_fin))
-        all_histoire_noise_debut = self.embedding(np.array(all_histoire_noise_debut))
+                all_stories_end_embedded.append(story_beg)
+                all_stories_noise_beg.append(story_noise_end)
+                all_stories_noise_end.append(story_noise_beg)
+                all_stories_beg_embedded.append(story_end)
+        all_stories_end_embedded = self.embedding(np.array(all_stories_end_embedded))
+        all_stories_beg_embedded = self.embedding(np.array(all_stories_beg_embedded))
+        all_stories_noise_end = self.embedding(np.array(all_stories_noise_end))
+        all_stories_noise_beg = self.embedding(np.array(all_stories_noise_beg))
         all_history_ref_embedding = self.embedding(np.array(all_history_ref))
-        if self.use_frozen:  # We swithed up the right and bad ones
+        if self.use_frozen:  # We switched up the sources and targets
             ones = np.ones(len(batch))
-            # disriminator bust be at one because inverted
-            return [all_histoire_debut_embedding, all_histoire_noise_debut,
-                    all_histoire_fin_embedding, all_histoire_noise_fin, all_history_ref_embedding], [ones, ones, ones,
-                                                                                                     ones]
+            # disriminator must be one because inverted
+            return [all_stories_beg_embedded, all_stories_noise_beg,
+                    all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [ones, ones]
         zeros = np.zeros(len(batch))
-        return [all_histoire_debut_embedding, all_histoire_noise_debut,
-                all_histoire_fin_embedding, all_histoire_noise_fin, all_history_ref_embedding], [zeros, zeros, zeros,
-                                                                                                 zeros, zeros, zeros,
-                                                                                                 zeros,
-                                                                                                 zeros]
+        return [all_stories_beg_embedded, all_stories_noise_beg,
+                all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [zeros, zeros, zeros]
+
+    def output_fn(self, data):
+        """
+        :param data:
+        :return:
+        """
+        batch = np.array(data.batch)
+        all_stories_beg_embedded = []
+        all_stories_end_embedded = []
+        all_stories_noise_beg = []
+        all_stories_noise_end = []
+        all_history_ref = []
+        for b in batch:
+            all_history_ref.append(" ".join(b[3]))
+            story_beg = " ".join(b[4])
+            story_noise_beg = self.add_noise(story_beg)
+            story_end = " ".join(b[5])
+            story_noise_end = self.add_noise(story_end)
+            label = int(b[6][0]) - 1
+            # sentences inverted and not use frozen or sentence correct and use frozen
+            if not self.use_frozen and label == 1 or self.use_frozen and label == 0:
+                all_stories_beg_embedded.append(story_end)
+                all_stories_end_embedded.append(story_beg)
+                all_stories_noise_beg.append(story_noise_end)
+                all_stories_noise_end.append(story_noise_beg)
+            else:
+                all_stories_beg_embedded.append(story_beg)
+                all_stories_end_embedded.append(story_end)
+                all_stories_noise_beg.append(story_noise_beg)
+                all_stories_noise_end.append(story_noise_end)
+        all_stories_end_embedded = self.embedding(np.array(all_stories_end_embedded))
+        all_stories_beg_embedded = self.embedding(np.array(all_stories_beg_embedded))
+        all_stories_noise_end = self.embedding(np.array(all_stories_noise_end))
+        all_stories_noise_beg = self.embedding(np.array(all_stories_noise_beg))
+        all_history_ref_embedding = self.embedding(np.array(all_history_ref))
+        if self.use_frozen:  # We switched up the sources and targets
+            ones = np.ones(len(batch))
+            # disriminator must be one because inverted
+            return [all_stories_beg_embedded, all_stories_noise_beg,
+                    all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [ones, ones]
+        zeros = np.zeros(len(batch))
+        return [all_stories_beg_embedded, all_stories_noise_beg,
+                all_stories_end_embedded, all_stories_noise_end, all_history_ref_embedding], [zeros, zeros, zeros]
 
     def output_fn_test(self, data):
         """
@@ -447,39 +428,39 @@ class Script(DefaultScript):
         :return:
         """
         batch = np.array(data.batch)
-        all_histoire_debut_embedding = []
-        all_histoire_fin_embedding = []
-        all_histoire_noise_debut = []
-        all_histoire_noise_fin = []
+        all_stories_beg_embedded = []
+        all_stories_end_embedded = []
+        all_stories_noise_beg = []
+        all_stories_noise_end = []
         all_history_ref = []
         label1 = []
         label2 = []
         for b in batch:
             all_history_ref.append(" ".join(b[3]))
-            histoire_debut = " ".join(b[4])
-            histoire_noise_debut = self.add_noise(histoire_debut)
-            histoire_fin = " ".join(b[5])
-            histoire_noise_fin = self.add_noise(histoire_fin)
-            all_histoire_debut_embedding.append(histoire_debut)
-            all_histoire_fin_embedding.append(histoire_fin)
-            all_histoire_noise_debut.append(histoire_noise_debut)
-            all_histoire_noise_fin.append(histoire_noise_fin)
+            story_beg = " ".join(b[4])
+            story_noise_beg = self.add_noise(story_beg)
+            story_end = " ".join(b[5])
+            story_noise_end = self.add_noise(story_end)
+            all_stories_beg_embedded.append(story_beg)
+            all_stories_end_embedded.append(story_end)
+            all_stories_noise_beg.append(story_noise_beg)
+            all_stories_noise_end.append(story_noise_end)
             label = int(b[6][0]) - 1
             # 0 if beginning = src = true sentence
             # 1 if beginning = target = false sentence
             label1.append(label)
             label2.append(1 - label)
-        all_histoire_fin_embedding = self.embedding(np.array(all_histoire_fin_embedding))
-        all_histoire_debut_embedding = self.embedding(np.array(all_histoire_debut_embedding))
-        all_histoire_noise_fin = self.embedding(np.array(all_histoire_noise_fin))
-        all_histoire_noise_debut = self.embedding(np.array(all_histoire_noise_debut))
+        all_stories_end_embedded = self.embedding(np.array(all_stories_end_embedded))
+        all_stories_beg_embedded = self.embedding(np.array(all_stories_beg_embedded))
+        all_stories_noise_end = self.embedding(np.array(all_stories_noise_end))
+        all_stories_noise_beg = self.embedding(np.array(all_stories_noise_beg))
         all_history_ref_embedding = self.embedding(np.array(all_history_ref))
         label1 = np.array(label1)
         label2 = np.array(label2)
-        return [all_histoire_debut_embedding,
-                all_histoire_noise_debut,
-                all_histoire_fin_embedding,
-                all_histoire_noise_fin, all_history_ref_embedding], [label1, label2, label1, label2]
+        return [all_stories_beg_embedded,
+                all_stories_noise_beg,
+                all_stories_end_embedded,
+                all_stories_noise_end, all_history_ref_embedding], [label1, label2]
 
 
 class ElmoEmbedding:
