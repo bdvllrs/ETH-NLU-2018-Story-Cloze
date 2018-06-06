@@ -102,6 +102,8 @@ class Script(DefaultScript):
 
         self.elmo_model = keras.models.Model(inputs=sentence, outputs=sentence_emb)
 
+        print("Getting datasets")
+
         train_set = SNLIDataloaderPairs('data/snli_1.0/snli_1.0_train.jsonl')
         train_set.set_preprocess_fn(preprocess_fn)
         train_set.load_vocab('./data/snli_vocab.dat', self.config.vocab_size)
@@ -117,6 +119,8 @@ class Script(DefaultScript):
 
         self.define_models()
 
+        print("load models")
+
         model = self.build_graph()
         frozen_model = self.build_frozen_graph()
 
@@ -131,6 +135,8 @@ class Script(DefaultScript):
 
         self.use_frozen = False
         min_source_loss = None
+
+        print("beginning training...")
 
         for k, (inputs, labels) in enumerate(generator_training):
             # We train the frozen model and the unfrozen model jointly
