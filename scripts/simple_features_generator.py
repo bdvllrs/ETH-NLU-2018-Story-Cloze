@@ -81,7 +81,7 @@ class Script(DefaultScript):
         verbose = 0 if not self.config.debug else 1
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # Callbacks
-        tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-simple_features/',
+        tensorboard = keras.callbacks.TensorBoard(log_dir='./logs/' + timestamp + '-simple_features_generator/',
                                                   histogram_freq=0,
                                                   batch_size=self.config.batch_size,
                                                   write_graph=False,
@@ -89,7 +89,7 @@ class Script(DefaultScript):
 
         model_path = os.path.abspath(
                 os.path.join(os.curdir, './builds/' + timestamp))
-        model_path += '-simple_features_epoch-{epoch:02d}.hdf5'
+        model_path += '-simple_features_generator_epoch-{epoch:02d}.hdf5'
 
         saver = keras.callbacks.ModelCheckpoint(model_path,
                                                 monitor='val_loss', verbose=verbose, save_best_only=True)
