@@ -114,11 +114,10 @@ class Script(DefaultScript):
         sentiment = Input((6,))
 
         # Layers
-        embedding_layer = Embedding(self.config.vocab_size, 64, input_length=5)
+        embedding_layer = Embedding(self.config.vocab_size, 16, input_length=5)
         flatten = Flatten()
-        layer_1 = Dense(1024, activation="relu")
-        layer_2 = Dense(128, activation="relu")
-        layer_3 = Dense(1, activation="sigmoid")
+        layer_1 = Dense(64, activation="relu")
+        layer_2 = Dense(1, activation="sigmoid")
 
         sentence_1_embedded = flatten(embedding_layer(sentence_1))
         sentence_2_embedded = flatten(embedding_layer(sentence_2))
@@ -133,8 +132,7 @@ class Script(DefaultScript):
                  ending_2_embedded, sentiment])  # of size 1542
 
         output = Dropout(0.5)(layer_1(features))
-        output = Dropout(0.5)(layer_2(output))
-        output = layer_3(output)
+        output = layer_2(output)
 
         model = keras.models.Model([sentence_1, sentence_2, sentence_3, sentence_4, ending_1, ending_2, sentiment],
                                    output)
