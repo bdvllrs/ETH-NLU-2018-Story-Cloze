@@ -114,12 +114,11 @@ class Script(DefaultScript):
         sentiment = Input((6,))
 
         # Layers
-        embedding_layer = Embedding(self.config.vocab_size, 128, input_length=5)
+        embedding_layer = Embedding(self.config.vocab_size, 64, input_length=5)
         flatten = Flatten()
-        layer_1 = Dense(2048, activation="relu")
-        layer_2 = Dense(1024, activation="relu")
-        layer_3 = Dense(128, activation="relu")
-        layer_4 = Dense(1, activation="sigmoid")
+        layer_1 = Dense(1024, activation="relu")
+        layer_2 = Dense(128, activation="relu")
+        layer_3 = Dense(1, activation="sigmoid")
 
         sentence_1_embedded = flatten(embedding_layer(sentence_1))
         sentence_2_embedded = flatten(embedding_layer(sentence_2))
@@ -133,14 +132,13 @@ class Script(DefaultScript):
                 [sentence_1_embedded, sentence_2_embedded, sentence_3_embedded, sentence_4_embedded, ending_1_embedded,
                  ending_2_embedded, sentiment])  # of size 1542
 
-        output = Dropout(0.2)(layer_1(features))
-        output = Dropout(0.2)(layer_2(output))
-        output = Dropout(0.2)(layer_3(output))
-        output = layer_4(output)
+        output = Dropout(0.5)(layer_1(features))
+        output = Dropout(0.5)(layer_2(output))
+        output = layer_3(output)
 
         model = keras.models.Model([sentence_1, sentence_2, sentence_3, sentence_4, ending_1, ending_2, sentiment],
                                    output)
-        model.compile('adam', 'binary_crossentropy', ['accuracy'])
+        model.compile(keras.optimizers.Adam(lr=0.0005), 'binary_crossentropy', ['accuracy'])
         return model
 
     def build_seq_to_seq_graph(self):
