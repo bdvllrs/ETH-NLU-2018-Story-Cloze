@@ -151,8 +151,8 @@ class Script(DefaultScript):
         embedding_layer = Embedding(self.config.vocab_size, 128, input_length=5)
         softmax = Dense(self.config.vocab_size, activation="softmax")
 
-        encoder = GRU(512, return_sequences=True, return_state=True)
-        decoder = GRU(512, return_sequences=True, return_state=True)
+        encoder = GRU(512, return_sequences=True, return_state=True, dropout=0.5, recurrent_dropout=0.5)
+        decoder = GRU(512, return_sequences=True, return_state=True, dropout=0.5, recurrent_dropout=0.5)
 
         sentence_1_embedded = embedding_layer(sentence_1)
         sentence_2_embedded = embedding_layer(sentence_2)
