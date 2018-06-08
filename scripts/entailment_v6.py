@@ -140,7 +140,7 @@ def test(config):
     generator_testing = test_set.get_batch(config.batch_size, config.n_epochs, random=True)
 
     keras_model = keras.models.load_model(
-        './builds/leonhard/2018-06-08 11:49:04-entailmentv6_checkpoint_epoch-55.hdf5')
+        './builds/leonhard/2018-06-08 12:04:03-entailmentv6_checkpoint_epoch-85.hdf5')
 
     verbose = 0 if not config.debug else 1
 
