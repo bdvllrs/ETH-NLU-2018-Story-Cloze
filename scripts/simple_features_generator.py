@@ -150,7 +150,7 @@ class Script(DefaultScript):
         sentences_2 = []
         sentences_3 = []
         sentences_4 = []
-        ringht_ending = []
+        right_ending = []
         wrong_ending = []
         for b in batch:
             sentiment, topics, _ = b
@@ -159,8 +159,8 @@ class Script(DefaultScript):
             sentences_2.append(topics[1])
             sentences_3.append(topics[2])
             sentences_4.append(topics[3])
-            ringht_ending.append(topics[4])
+            right_ending.append(topics[4])
             wrong_ending.append(topics[5])
         return [np.array(sentences_1), np.array(sentences_2), np.array(sentences_3), np.array(sentences_4),
-                np.array(ringht_ending), np.array(sentiments)], to_categorical(np.array(wrong_ending),
+                np.array(right_ending), np.array(sentiments)], to_categorical(np.array(wrong_ending),
                                                                                self.config.vocab_size)

@@ -132,7 +132,6 @@ def main(config):
 
     generator_training = train_set.get_batch(config.batch_size, config.n_epochs)
     generator_dev = test_set.get_batch(config.batch_size, config.n_epochs)
-    print(next(generator_training))
 
     keras_model = model(config)
 

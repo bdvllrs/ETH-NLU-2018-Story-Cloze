@@ -63,7 +63,7 @@ class Script(DefaultScript):
 
     def train(self):
         self.generator_model = keras.models.load_model(
-                './builds/leonhard/2018-06-07 17:11:04-simple_features_generator_epoch-03.hdf5')
+                './builds/leonhard/2018-06-07 17:58:32-simple_features_generator_epoch-03.hdf5')
 
         self.graph = tf.get_default_graph()
 

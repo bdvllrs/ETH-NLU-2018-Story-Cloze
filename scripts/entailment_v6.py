@@ -26,12 +26,8 @@ class Script(DefaultScript):
     def train(self):
         main(self.config)
 
-    # def test(self):
-    #     testing_set = Dataloader(self.config, testing_data=True)
-    #     testing_set.load_dataset('data/test.bin')
-    #
-    #     testing_set.load_vocab('data/default.voc', self.config.vocab_size)
-    #     test(self.config, testing_set)
+    def test(self):
+        test(self.config)
 
 
 class OutputFnTest:
@@ -118,7 +114,7 @@ def main(config):
     model_path += '-entailmentv6_checkpoint_epoch-{epoch:02d}.hdf5'
 
     saver = keras.callbacks.ModelCheckpoint(model_path,
-                                            monitor='val_loss', verbose=verbose, save_best_only=True)
+                                            monitor='val_acc', verbose=verbose, save_best_only=True)
 
     keras_model.fit_generator(generator_training, steps_per_epoch=5,
                               epochs=config.n_epochs,
@@ -128,27 +124,28 @@ def main(config):
                               callbacks=[tensorboard, saver])
 
 
-# def test(config, testing_set):
-#     import sent2vec
-#     assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
-#     sent2vec_model = sent2vec.Sent2vecModel()
-#     sent2vec_model.load_model(config.sent2vec.model)
-#
-#     preprocess_fn = PreprocessTest(sent2vec_model)
-#     testing_set.set_preprocess_fn(preprocess_fn)
-#
-#     output_fn_test = OutputFnTest(sent2vec_model, config)
-#
-#     testing_set.set_output_fn(output_fn_test)
-#
-#     generator_testing = testing_set.get_batch(config.batch_size, config.n_epochs, random=True)
-#
-#     keras_model = keras.models.load_model(
-#         './builds/leonhard/2018-05-19 22:33:08-entailmentv2_checkpoint_epoch-1810.hdf5')
-#
-#     verbose = 0 if not config.debug else 1
-#
-#     # test_batch = next(generator_testing)
-#     loss = keras_model.evaluate_generator(generator_testing, steps=len(testing_set) / config.batch_size,
-#                                           verbose=verbose)
-#     print(loss)
+def test(config):
+    import sent2vec
+    assert config.sent2vec.model is not None, "Please add sent2vec_model config value."
+    sent2vec_model = sent2vec.Sent2vecModel()
+    sent2vec_model.load_model(config.sent2vec.model)
+
+    output_fn_test = OutputFnTest(sent2vec_model, config)
+
+    test_set = Dataloader(config, 'data/test_stories.csv', testing_data=True)
+    test_set.load_dataset('data/test.bin')
+    test_set.load_vocab('./data/default.voc', config.vocab_size)
+    test_set.set_output_fn(output_fn_test)
+
+    generator_testing = test_set.get_batch(config.batch_size, config.n_epochs, random=True)
+
+    keras_model = keras.models.load_model(
+        './builds/leonhard/2018-06-08 11:49:04-entailmentv6_checkpoint_epoch-55.hdf5')
+
+    verbose = 0 if not config.debug else 1
+
+    # test_batch = next(generator_testing)
+    print(keras_model.metrics_names)
+    loss = keras_model.evaluate_generator(generator_testing, steps=len(test_set) / config.batch_size,
+                                          verbose=verbose)
+    print(loss)
